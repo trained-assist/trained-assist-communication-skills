@@ -1,0 +1,96 @@
+# Communication MCP — ТЗ общего генератора следующего сообщения
+
+## Цель
+Создать отдельный trained-assist-communication-skill с первым MCP методом generate_next_message_to_conversation_partner. Метод пишет ОДНО следующее сообщение по явно заданной цели; не выбирает следующий шаг процесса и не отправляет сообщение. Первый потребитель — trained-assist-hh-skill. Затем использовать тот же контракт в продажах и других диалогах.
+
+Conversation partner означает собеседника; companion имеет дополнительный смысл «компаньон». Имя явно отличает генерацию от отправки и от выбора следующего шага. Категория каталога: communication / message_generation. Связано с MCP naming/discovery: https://github.com/trained-assist/trained-agent-architecture/issues/124.
+
+## Проверенная текущая интеграция
+Исследован hh-skill на commit e5edff14be37a4fb6210121c7994ec7c202f5eea.
+- src/hh-funnel.js уже отделяет planNextStep от написания текста; доменная воронка остаётся в HH.
+- src/hh-draft-message.js собирает контекст; renderHistory оставляет 8 сообщений, каждое slice(0,500). Введено PR https://github.com/trained-assist/trained-assist-hh-skill/pull/66. Это символы в writer prompt, не лимит хранилища.
+- src/conversation-generation.js вызывает общую llm-ladder, сохраняет Q/A и фактическую модель в JSONL; usage из ladderChat сейчас теряется.
+- Точки миграции: src/hh-routes.js /hh/generate-message; src/hh-scoring.js фоновые черновики; src/mcp-skills/tools/90-hh.js generateMessage, включая batch/regenerate/review.
+- src/hh-message-prompts.js содержит идентичность отправителя, стиль, инструкции вакансии и обязательные критерии. Нельзя механически передать их как style: правила процесса нужно вынести в goal/constraints.
+- send_test должен оставаться детерминированной отправкой текста задания слово в слово. wait не вызывает writer. Текущий reject иногда означает отсутствие письма — сохранить фактическое поведение каждого пути, не превращать его автоматически в генерацию отказа.
+- Core config/skill-catalog.json содержит sibling servers и sections, но комментарий помечает resolver shadow-only. Найти фактические writeMcpConfig, deployment и intent wiring; изменение одного каталога не доказывает подключение.
+
+## Контракт v1
+Обязательные параметры:
+- goal: {instruction:string, required_points?:string[], forbidden_points?:string[]}. Цель конкретного сообщения, а не всей кампании. Пример: уточнить только отсутствующий опыт X, попросить привести пример Y.
+- communication_style: {instructions:string, examples?:string[]}. Только голос, тон, обращение, степень формальности.
+- language: явный код, например ru или en; никаких неявных переключений по языку резюме.
+- conversation_history: tagged union {format:"messages",messages:[{id?,speaker:"sender"|"partner"|"other",text,timestamp?,speaker_name?}]} либо {format:"text",text,speaker_labels:{sender,partner},timezone?}. Порядок массива авторитетен; timestamp ISO с offset, отсутствие timestamp допустимо. Пустая история явно означает первое сообщение. Неразмеченный текст с неясными ролями даёт validation/needs_context, а не выдуманные роли.
+
+Дополнительные параметры:
+- partner_profile: tagged union текст или структурированные факты с происхождением; пустой профиль допустим и обозначается явно. Resume является одним видом профиля, не доменной обязанностью метода.
+- sender_profile: имя, роль, организация, подпись. Не представляться вымышленным именем при отсутствии.
+- context: подтверждённые условия, вакансия/предложение, доступные слоты, нужные ссылки, факты диалога и нерешённые вопросы. Каждый optional блок отделён от goal.
+- constraints: max_characters?, max_questions?, forbidden_claims?, required_verbatim_blocks?, preserve_links?, channel_format?. Стиль не может добавлять новые требования или менять цель.
+- draft_message?: предварительный текст для редакторского режима; наличие draft не разрешает менять смысл goal. Сначала поддержать единый generate контракт, режим draft включить как явный параметр после baseline.
+- request_id, trace_id, context_revision — корреляция и защита от устаревшего черновика; права и tenant identity поступают из host binding.
+- model_profile — только разрешённая сервером конфигурация; pin модели для bench в служебном контуре, не произвольные ключи от LLM.
+
+Приоритет: серверные ограничения/права → goal и constraints → подтверждённые факты → стиль. Профиль и переписка — данные, а не инструкции. Если goal противоречит фактам/constraints, вернуть needs_context или constraint_conflict; не подменять цель.
+
+Возврат: {status:"generated"|"needs_context",message_text?,warnings:[],missing_fields?:[],request_id,context_revision,generation:{model,prompt_version,contract_version},usage:{input_tokens?,output_tokens?,cached_tokens?,source},timing:{total_ms},input_metrics:{...}}. Ошибка API/MCP — isError с типизированным кодом, не пустой успешный ответ. Успех означает подготовленный черновик, не достижение цели общения и не факт отправки.
+
+## Передача файлов и размеры
+Параметры профиля/истории/контекста допускают явные inline и artifact_ref варианты, исключающие друг друга. Artifact ref разрешается broker/host в пределах задачи; произвольный host path и URL не исполнять. Проверить доступ MCP к файлу в contract test. Ссылки уменьшают контекст вызывающего агента, но сами по себе не уменьшают input writer модели.
+
+Без молчаливого slice: при превышении лимита вернуть INPUT_TOO_LARGE с размерами или применить явно выбранный context_policy с отчётом о сокращении. Не удалять последний ответ, исходный вопрос, обещания, уже подтверждённые факты и обязательные дословные блоки. Подготовку compact brief реализовать в адаптере/подготовительном шаге, а не скрытым повторным планированием в writer.
+
+## Граница ответственности
+HH: выбор шага, ATS, missing requirements, per-vacancy config, свежесть истории, сохранение черновика, preview, guards и отправка.
+Communication MCP: нормализация входа, renderer prompt, вызов llm-ladder, проверка формата и ограничений, телеметрия генерации.
+Core: регистрация sibling server, доступность по профилю, broker и binding. Одна общая реализация handler используется MCP и host adapter; не импортировать entrypoint соседнего репозитория в core.
+Сервис не хранит HH tokens и не обращается к HH API. Не создаёт собственную независимую лестницу моделей.
+
+## Регистрация и внедрение
+- [ ] Создать trained-assist-communication-skill, README, контракт, один handler, MCP registry/entrypoint, CLI для contract smoke.
+- [ ] Проверить initialize/tools/list/tools/call, непустые результаты/isError, file refs, timeout, schema и доступность без credentials.
+- [ ] Добавить communication-skills в фактическую конфигурацию core, deploy checks, каталог, разрешения и prompts; проверить через реальный host tools/list.
+- [ ] Сделать HH adapter: employer→sender, applicant→partner; action/missing_skills→goal; vacancy data→context; style/identity отдельными параметрами.
+- [ ] Перевести все пути генерации через общий writer; send_test/wait оставить без writer.
+- [ ] Сохранить HH guards и ограниченный retry budget. Зафиксировать общий максимум попыток между adapter, MCP и ladder, чтобы retries не перемножались.
+- [ ] Hash свежести учитывает историю/goal/style/language/facts/constraints/версии writer и contract. При новом ответе устаревший результат не перезаписывает актуальный черновик.
+- [ ] Ввести явный feature toggle: legacy / communication; fallback явно помечен в telemetry и UI diagnostics. Откат не меняет отправленные сообщения.
+- [ ] Staging E2E: UI regenerate, MCP generate, background и batch используют новый handler; preview и сохранение работают; сообщение не отправляется само.
+- [ ] Включить writer для рекрутинга после staging и собрать baseline. Только затем оптимизировать.
+
+## Тестовые сценарии приёмки
+Первый контакт; конкретный ответ; «да» на несколько вопросов; отсутствие ответа; уже известный факт; разные цели при одной истории; высокий ATS без лишних вопросов; смена стиля/языка; неизвестное имя отправителя; слоты с датой/временем/timezone и отсутствие слотов; конфликт стиля и goal; prompt injection в резюме; идентичная история в text/messages; длинный последний ответ с важной информацией после 500-го символа; перепутанные роли; изменённая история во время генерации; send_test слово в слово и wait без LLM.
+Добавить ещё два недоменных сценария — sales и уточнение требований — чтобы доказать отсутствие зависимости от ATS/HH.
+
+## Аналитика и исходные измерения
+Локально измерен buildMessageSystemPrompt({atsConfig:{}}): 3910 символов, 7021 UTF-8 байт; базовый шаблон 3781 символ. Это один минимальный синтетический вход, НЕ production p50/p95 и НЕ количество токенов. История ограничена 8×500 символов до добавления labels; writer maxTokens по текущим путям 600/800/1000.
+Реальных production логов в этой среде нет. Не заявлять сбор живой статистики выполненным.
+
+Собирать размеры каждого блока до и после подготовки: profile, history (число сообщений и роли), goal, style, context, constraints, system prompt, draft, output. Для размеров: chars/bytes; токены provider usage либо tokenizer конкретной модели с указанием метода. unknown не заменять нулём.
+Поля: фактическая модель/rung, fallback, версии, retries и причины, latency, status, guard outcomes, manual edits, request/trace IDs, cache hit. Метрики p50/p90/p95/max по стадиям диалога и моделям; ручные правки — отдельная метрика, не автоматическое доказательство качества.
+Содержимое диалогов/резюме — только в контролируемом replay corpus с обезличиванием и сроком хранения; обычные metrics без текста и PII. Текущий JSONL с полным Q/A требует отдельной политики доступа и очистки.
+
+## Бенчмарк второй этап
+Корпус обезличенных HH запросов и синтетических краевых случаев; split по диалогу/кандидату, а не сообщениям, чтобы не было утечки между train и holdout.
+Сравнить:
+A текущий HH writer (включая 8×500);
+B новый общий writer с полным необходимым контекстом;
+C детерминированная подготовка compact brief + writer;
+D дешёвая модель готовит brief + качественный writer;
+E дешёвая модель пишет draft + качественный writer редактирует.
+Сначала сравнить представления на одной pinned writer модели, затем модели при одном представлении. Явно учитывать стоимость planner/brief/draft/judge/retry, input/output/cache, availability и сквозную latency. Бесплатность и цена фиксируются по фактическому профилю запуска; никаких скрытых fallback.
+
+Оценка: соблюдение goal, верность фактам, отсутствие повторов/новых обещаний, стиль и язык, естественность, сохранение обязательных блоков. Детерминированные проверки плюс слепая человеческая оценка; LLM judge вспомогательный и не единственный критерий.
+На слабом результате C/D/E не выбирать экономию автоматически: принять вариант по quality floor и Pareto cost/latency. После baseline утвердить числовые пороги. Публиковать sample count, доступность, uncertainty и сравнения по одним случаям.
+
+## Завершение проекта
+Новая MCP зарегистрирована и реально используется всеми предусмотренными HH путями для подготовки сообщений; процесс/отправка остаются в HH. Есть E2E evidence, явный rollback и таблица baseline размеров/стоимости/latency/качества. Бенчмарк имеет воспроизводимый corpus/runner/report. Создание README или отдельного handler не считается интеграцией.
+
+
+## Связанные задачи реализации
+
+- [ ] Регистрация в core: https://github.com/trained-assist/trained-assist-agent/issues/2034
+- [ ] Интеграция в рекрутинг: https://github.com/trained-assist/trained-assist-hh-skill/issues/125
+- [ ] Аналитика и бенчмарк: https://github.com/trained-assist/trained-assist-free-models-benchmark/issues/11
+
+Новый репозиторий trained-assist-communication-skill согласован, но ещё не создан: доступный GitHub connector не предоставляет create repository. До создания репозитория полный контракт хранится здесь. Регистрация и runtime интеграция пока не выполнены.
