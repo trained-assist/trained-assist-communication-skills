@@ -18,11 +18,29 @@
 - HH остаётся владельцем: выбор шага, ATS, хранение черновика, preview, отправка.
 - Core: регистрация sibling MCP server (trained-assist/trained-assist-agent#2034).
 
+## Устройство (contract v1)
+
+| Файл | Роль |
+|---|---|
+| `src/handler.mjs` | единственный handler: нормализация входа, размеры, needs_context, генерация с общим retry budget, guard; `evaluate_message_quality` — тот же guard вторым входом |
+| `src/prompt.mjs` | детерминированный renderer prompt (goal попадает в prompt дословно) |
+| `src/ladder.mjs` | клиент общей лестницы (`POST /v1/chat/completions`), без своих ключей и fallback-цепочек |
+| `src/mcp/entrypoint.mjs` | MCP-сервер: `initialize` / `tools/list` / `tools/call` — тонкая дверь над handler'ем |
+
+Guard детерминирован и не тратит лестницу: ограничения (`forbidden_claims`, `max_characters`, `max_questions`,
+`required_verbatim_blocks`), повтор ранее сказанного, язык. Вопросы считаются по знакам вопроса — это честный floor;
+семантический подсчёт — задача будущего судьи, бюджета на дополнительный вызов лестницы в контракте нет.
+Общий retry budget = 2 попытки генерации всего (не перемножается между вызовами, guard'ом и лестницей).
+
+Типизированные ответы: `INPUT_TOO_LARGE` (с размерами, без молчаливого slice), `GENERATION_REJECTED` (бюджет исчерпан),
+`LLM_UNAVAILABLE`, `VALIDATION_ERROR`, `MODEL_PROFILE_NOT_ALLOWED`; `needs_context` — вместо выдуманных ролей и фактов.
+Телеметрия (stderr) — только идентификаторы, статусы, версии и размеры: ни текста диалогов, ни PII.
+
 ## Песочница (sandbox) — замкнутый цикл уровня S5
 
 ```bash
 bash scripts/sandbox/run.sh              # полный вердикт: 0 = все проверки сценария зелёные
-bash scripts/sandbox/run.sh --expect-red # текущий этап плана: харнесс зелёный, сценарий красный (код 10)
+bash scripts/sandbox/run.sh --expect-red # этап «фича ещё не написана» (сейчас всегда ошибка: entrypoint есть)
 ```
 
 Одна команда, без сети, без модели и без токена. Харнесс поднимает фейковую лестницу
@@ -41,7 +59,7 @@ bash scripts/sandbox/run.sh --expect-red # текущий этап плана: �
 - `self-check` (всегда зелёный) доказывает, что красный сценарий — про фичу, а не про харнесс:
   контракт фейковой лестницы, JSON-RPC stdio через `probe-entrypoint.mjs`, достижимость всех
   сценариев лестницы из фикстур, 7 кейсов движка проверок, распаковка `tools/call`.
-- Время цикла: ~0.2 с. Полный зелёный цикл появится, когда handler будет написан (шаг «Ходячий скелет»).
+- Время цикла: ~0.5 с. Зелёный сценарий = 15/15 проверок на живом коде.
 
 ## Claude Code Instructions
 
@@ -80,7 +98,8 @@ entrypoint нет → `--expect-red`, появился → строгий зел
 - [x] Репозиторий создан, контракт зафиксирован (02.10.2026)
 - [x] Каркас: CI (check/tests/sandbox + защита main только через PR), ADR-0001, флаги требований, первый сценарий, CLAUDE.md (02.10.2026)
 - [x] Песочница: сценарий через MCP tools/call, одна команда, падает на отсутствующем handler (02.10.2026)
-- [ ] handler + MCP entrypoint + contract smoke CLI
+- [x] Ходячий скелет: handler + `src/mcp/entrypoint.mjs`, песочница 15/15 зелёная на живом коде (02.10.2026)
+- [ ] CLI contract smoke + юнит/контракт-тесты (шаг «Полная локальная проверка»)
 - [ ] Регистрация в core (agent#2034)
 - [ ] HH adapter, все пути генерации (hh-skill#125)
 - [ ] Staging E2E + baseline
