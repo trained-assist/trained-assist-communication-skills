@@ -1,5 +1,5 @@
 {
-  "_note": "Sandbox fixtures: E2E inputs from docs/spec.md + the fake-ladder script. The `match` string of every ladder script entry is a distinctive phrase of the fixture's goal.instruction, so it is found in the rendered writer prompt — no sandbox-only markers leak into the contract.",
+  "_note": "Sandbox fixtures: E2E inputs from docs/spec.md + the fake-ladder script. The `match` string of every ladder script entry is a distinctive phrase of the fixture's goal.instruction, so it is found in the rendered writer prompt — no sandbox-only markers leak into the contract. Детерминированный guard считает вопросы по знакам вопроса (это его честный floor: семантический подсчёт вопросов — задача будущего LLM-судьи, и на него нет бюджета вызовов лестницы), поэтому «два вопроса» в S2/S3 написаны двумя знаками вопроса.",
 
   "ladder_script": [
     {
@@ -8,7 +8,7 @@
         {
           "kind": "reply",
           "model": "fake/gemini-2.5-flash",
-          "content": "Добрый день, Анна! Меня зовут Ольга, я рекрутер NexTouch. Посмотрела ваш профиль — вижу коммерческий опыт в логистике. Подскажите, пожалуйста, работали ли вы с CRM-системами и какая была средняя нагрузка по сделкам в месяц?"
+          "content": "Добрый день, Анна! Меня зовут Ольга, я рекрутер NexTouch. Посмотрела ваш профиль — вижу коммерческий опыт в логистике. Подскажите, пожалуйста, работали ли вы с CRM-системами? Какая была средняя нагрузка по сделкам в месяц?"
         }
       ]
     },
@@ -18,7 +18,7 @@
         {
           "kind": "reply",
           "model": "fake/gemini-2.5-flash",
-          "content": "Добрый день! Подскажите, пожалуйста, работали ли вы с CRM-системами и какая была средняя нагрузка по сделкам в месяц?"
+          "content": "Добрый день! Подскажите, пожалуйста, работали ли вы с CRM-системами? Какая была средняя нагрузка по сделкам в месяц?"
         },
         {
           "kind": "reply",

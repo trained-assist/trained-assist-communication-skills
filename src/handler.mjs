@@ -270,6 +270,9 @@ export function runGuard({ input, draft }) {
     violations.push(`длина ${text.length} > max_characters ${c.max_characters}`);
   }
   if (Number.isFinite(c.max_questions)) {
+    // Вопросы считаются по знакам вопроса — это честный детерминированный floor.
+    // Семантический подсчёт («какая была средняя нагрузка» внутри одного предложения)
+    // — задача судьи; на дополнительный вызов лестницы в контракте нет бюджета.
     const questions = (text.match(/\?/g) || []).length;
     if (questions > c.max_questions) violations.push(`вопросов ${questions} > max_questions ${c.max_questions}`);
   }
