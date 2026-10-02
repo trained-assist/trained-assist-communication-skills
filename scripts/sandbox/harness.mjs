@@ -256,7 +256,7 @@ async function runScenario(sc, client, ladder) {
   const { isError, data, text } = unpack(reply.result);
   const after = await ladderCalls(ladder);
   const problems = evaluateExpectations(sc.expect || {}, data, isError, after - before, text);
-
+  record('сценарий', label, problems.length === 0, problems.join(' · '));
 }
 
 // ───────────────────────── self-check ─────────────────────────
