@@ -22,11 +22,17 @@ function renderConstraints(constraints) {
   return Object.entries(constraints).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join('; ') : String(v)}`);
 }
 
+import { renderDialogState } from './dialog-state.mjs';
+
 /**
+ * @param {object} input normalised contract v1 input
+ * @param {object} [state] extractDialogState() output — rendered as its own
+ *   section so the writer can never miss it, and so the section can be asserted
+ *   in tests without parsing the whole prompt.
  * @returns {{messages: Array<{role:string,content:string}>}} ladder payload;
  * the goal instruction is embedded verbatim so the writer prompt always carries the goal.
  */
-export function renderWriterPrompt(input) {
+export function renderWriterPrompt(input, state = null) {
   const system = [
     'Ты пишешь РОВНО ОДНО следующее сообщение в диалоге. Ты не выбираешь шаг процесса и ничего не отправляешь — только текст черновика.',
     `Пиши строго на языке ${input.language}.`,
@@ -75,8 +81,14 @@ export function renderWriterPrompt(input) {
     '- напиши одно следующее сообщение по цели выше;',
     '- опирайся только на факты из истории/профиля/context — ничего не додумывай;',
     '- соблюдай ограничения (длина, число вопросов, дословные блоки) — они строже стиля;',
+    '- не переспрашивай то, на что уже есть ответ, и не возвращайся к отказам;',
     '- не пиши ничего кроме текста сообщения.',
   ]));
+
+  // Mandatory dialog state goes LAST, immediately before the rules: it is the
+  // section a writer is most likely to under-apply once the history above is long.
+  const stateBlock = renderDialogState(state);
+  if (stateBlock) parts.push(block('Обязательное состояние диалога (извлечено из полной истории)', stateBlock));
 
   return { messages: [{ role: 'system', content: system }, { role: 'user', content: parts.join('\n') }] };
 }

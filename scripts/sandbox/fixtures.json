@@ -41,8 +41,16 @@
       ]
     },
     {
-      "match": "оцените это сообщение",
-      "responses": [{ "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "ok" }]
+      "match": "выясните, можно ли ещё писать",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "Добрый день! Вы просили больше не писать — если передумаете, напишите, и я вернусь с подходящими вакансиями." }
+      ]
+    },
+    {
+      "match": "уточните формат работы",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "Добрый день, Анна! Вы ответили, что готовы работать удалённо. Посмотрела ваш профиль — вижу коммерческий опыт в логистике. Подскажите, пожалуйста, работали ли вы с CRM-системами? Какая была средняя нагрузка по сделкам в месяц?" }
+      ]
     },
     {
       "match": "сгенерируйте одно сообщение",
@@ -53,7 +61,7 @@
   "scenarios": [
     {
       "id": "S1-mcp-handshake",
-      "title": "MCP handshake: initialize → tools/list содержит оба инструмента",
+      "title": "MCP handshake: initialize → tools/list содержит канонический инструмент",
       "tool": null,
       "expect": { "kind": "handshake" }
     },
@@ -140,43 +148,47 @@
       "expect": { "kind": "generate", "status": "needs_context", "missing_fields_nonempty": true, "message_text_nonempty": false, "ladder_calls": 0 }
     },
     {
-      "id": "S6-evaluate-repeat-deterministic",
-      "title": "evaluate_message_quality: draft дословно повторяет партнёра → verdict=repeat, лестница НЕ вызывается",
-      "tool": "evaluate_message_quality",
+      "id": "S6-no-contact-requested",
+      "title": "Запрет контакта → no_message_needed, лестница НЕ вызывается (issue #6 R2)",
+      "tool": "generate_next_message_to_conversation_partner",
       "arguments": {
-        "goal": { "instruction": "Оцените это сообщение и не повторяйте слова партнёра." },
-        "communication_style": { "instructions": "Ты — рекрутер NexTouch." },
+        "goal": { "instruction": "Выясните, можно ли ещё писать кандидату, и если да — предложите вакансию." },
+        "communication_style": { "instructions": "Ты — рекрутер NexTouch, вежливо и кратко." },
         "language": "ru",
         "conversation_history": {
           "format": "messages",
           "messages": [
-            { "id": "m1", "speaker": "partner", "text": "Здравствуйте! Я два года вёл логистику в региональной компании.", "timestamp": "2026-09-28T10:15:00+03:00" }
+            { "id": "m1", "speaker": "sender", "text": "Добрый день, Анна! Приглашаю на созвон.", "timestamp": "2026-09-28T10:00:00+03:00" },
+            { "id": "m2", "speaker": "partner", "text": "Больше не пишите мне, пожалуйста.", "timestamp": "2026-09-28T10:15:00+03:00" }
           ]
         },
-        "draft_message": "Добрый день! Подскажите, пожалуйста, работали ли вы с CRM-системами и какая была средняя нагрузка по сделкам в месяц?",
         "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
-        "request_id": "sb-eval-ok"
+        "constraints": { "max_characters": 600 },
+        "request_id": "sb-no-contact"
       },
-      "expect": { "kind": "evaluate", "verdict": "ok", "reasons_array": true, "ladder_calls": 0 }
+      "expect": { "kind": "generate", "status": "no_message_needed", "message_text_nonempty": false, "ladder_calls": 0 }
     },
     {
-      "id": "S7-evaluate-constraint-violation",
-      "title": "evaluate_message_quality: draft нарушает constraints → verdict=constraint_violated без вызова лестницы",
-      "tool": "evaluate_message_quality",
+      "id": "S7-answered-question-not-repeated",
+      "title": "Отвеченный вопрос не переспрашивается; в prompt есть состояние диалога (issue #6 R1)",
+      "tool": "generate_next_message_to_conversation_partner",
       "arguments": {
-        "goal": { "instruction": "Уточните один конкретный пробел в опыте кандидата." },
-        "communication_style": { "instructions": "Ты — рекрутер NexTouch." },
+        "goal": { "instruction": "Уточните формат работы и предложите созвон." },
+        "communication_style": { "instructions": "Ты — рекрутер NexTouch, спокойно и без канцелярита." },
         "language": "ru",
-        "conversation_history": { "format": "messages", "messages": [] },
-        "draft_message": "Мы гарантируем повышение после испытательного срока и полную компенсацию всех расходов на обучение.",
-        "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
-        "constraints": {
-          "max_characters": 200,
-          "forbidden_claims": ["гарантируем повышение", "полную компенсацию всех расходов"]
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            { "id": "m1", "speaker": "sender", "text": "Добрый день! Готовы работать удалённо?", "timestamp": "2026-09-28T10:00:00+03:00" },
+            { "id": "m2", "speaker": "partner", "text": "Да, только удалённо, офис не рассматриваю.", "timestamp": "2026-09-28T10:15:00+03:00" }
+          ]
         },
-        "request_id": "sb-eval-constraint"
+        "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
+        "context": { "vacancy": "Менеджер по продажам B2B, удалённо" },
+        "constraints": { "max_characters": 600, "max_questions": 2 },
+        "request_id": "sb-answered"
       },
-      "expect": { "kind": "evaluate", "verdict": "constraint_violated", "reasons_array": true, "ladder_calls": 0 }
+      "expect": { "kind": "generate", "status": "generated", "ladder_calls": 1, "message_text_nonempty": true, "prompt_contains": ["Обязательное состояние диалога", "не переспрашивай"] }
     },
     {
       "id": "S8-input-too-large",

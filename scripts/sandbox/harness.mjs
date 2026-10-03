@@ -163,6 +163,14 @@ async function ladderCalls(ladder) {
   return body.count || 0;
 }
 
+// The fake ladder records every request it served, prompts included — that is what
+// lets a scenario assert on what the WRITER actually saw.
+async function fetchPrompts(ladder) {
+  const res = await fetch(`${ladder.url}/__calls`);
+  const body = await res.json();
+  return Array.isArray(body.calls) ? body.calls : [];
+}
+
 async function setUpLadderScripts(fixtures) {
   return startFakeLadder({ scenarios: fixtures.ladder_script });
 }
@@ -185,7 +193,7 @@ function materialise(node) {
  * violated expectations (empty = check passed). Separated from the transport so the
  * self-check can prove the engine itself is not vacuous before the handler exists.
  */
-function evaluateExpectations(exp, data, isError, calls, text = '') {
+function evaluateExpectations(exp, data, isError, calls, text = '', prompts = []) {
   const problems = [];
 
   if (exp.ladder_calls !== undefined && calls !== exp.ladder_calls) {
@@ -230,6 +238,16 @@ function evaluateExpectations(exp, data, isError, calls, text = '') {
   for (const f of exp.absent_fields || []) {
     if (deepHasKey(data, f)) problems.push(`в ответе есть поле ${f} (успех ≠ отправка)`);
   }
+  // Asserts on what actually reached the WRITER. This is how "the dialog state is
+  // in the prompt" is proven rather than assumed — the state layer is invisible in
+  // the response, so without this a refactor could drop it and the sandbox stay green.
+  for (const needle of exp.prompt_contains || []) {
+    const hit = prompts.some((p) => String(p).includes(needle));
+    if (!hit) problems.push(`в prompt к лестнице нет «${needle}»`);
+  }
+  for (const needle of exp.prompt_excludes || []) {
+    if (prompts.some((p) => String(p).includes(needle))) problems.push(`в prompt к лестнице есть лишнее «${needle}»`);
+  }
   if (!exp.typed_code && !data) problems.push(`нет разбираемого ответа; текст: ${String(text).slice(0, 160)}`);
   if (!exp.typed_code && data && data.status === undefined && !problems.length) {
     problems.push(`в ответе нет status; текст: ${String(text).slice(0, 160)}`);
@@ -255,7 +273,11 @@ async function runScenario(sc, client, ladder) {
   }
   const { isError, data, text } = unpack(reply.result);
   const after = await ladderCalls(ladder);
-  const problems = evaluateExpectations(sc.expect || {}, data, isError, after - before, text);
+  // Prompts of THIS scenario's ladder calls only (slice the window we just measured),
+  // so prompt_contains can assert on this call and not on a previous scenario's.
+  const all = await fetchPrompts(ladder);
+  const prompts = all.slice(before, after).map((c) => (Array.isArray(c.messages) ? c.messages.map((m) => m.content).join('\n') : ''));
+  const problems = evaluateExpectations(sc.expect || {}, data, isError, after - before, text, prompts);
   record('сценарий', label, problems.length === 0, problems.join(' · '));
 }
 
@@ -368,10 +390,10 @@ async function main() {
       const init = await client.request('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'sandbox-harness', version: '0.0.0' } });
       const listed = await client.request('tools/list', {});
       const names = (listed.result?.tools || []).map((t) => t.name);
-      const handshakeOk = record('сценарий', 'S1-mcp-handshake — initialize + tools/list отдаёт оба инструмента со схемами',
+      const handshakeOk = record('сценарий', 'S1-mcp-handshake — initialize + tools/list отдаёт канонический инструмент со схемой',
         init.result?.serverInfo?.name === 'trained-assist-communication-skills'
         && names.includes('generate_next_message_to_conversation_partner')
-        && names.includes('evaluate_message_quality')
+        && names.length === 1
         && (listed.result?.tools || []).every((t) => t.inputSchema && t.description),
         `serverInfo=${JSON.stringify(init.result?.serverInfo)}, tools=${JSON.stringify(names)}`);
       client.notify('notifications/initialized', {});
