@@ -1,0 +1,236 @@
+{
+  "_note": "Sandbox fixtures: E2E inputs from docs/spec.md + the fake-ladder script. The `match` string of every ladder script entry is a distinctive phrase of the fixture's goal.instruction, so it is found in the rendered writer prompt — no sandbox-only markers leak into the contract. Детерминированный guard считает вопросы по знакам вопроса (это его честный floor: семантический подсчёт вопросов — задача будущего LLM-судьи, и на него нет бюджета вызовов лестницы), поэтому «два вопроса» в S2/S3 написаны двумя знаками вопроса.",
+
+  "ladder_script": [
+    {
+      "match": "поздоровайтесь и представьтесь",
+      "responses": [
+        {
+          "kind": "reply",
+          "model": "fake/gemini-2.5-flash",
+          "content": "Добрый день, Анна! Меня зовут Ольга, я рекрутер NexTouch. Посмотрела ваш профиль — вижу коммерческий опыт в логистике. Подскажите, пожалуйста, работали ли вы с CRM-системами? Какая была средняя нагрузка по сделкам в месяц?"
+        }
+      ]
+    },
+    {
+      "match": "уточните один конкретный пробел",
+      "responses": [
+        {
+          "kind": "reply",
+          "model": "fake/gemini-2.5-flash",
+          "content": "Добрый день! Подскажите, пожалуйста, работали ли вы с CRM-системами? Какая была средняя нагрузка по сделкам в месяц?"
+        },
+        {
+          "kind": "reply",
+          "model": "fake/gemini-2.5-flash",
+          "content": "Добрый день! Спасибо за ответ. Уточню один момент: какой у вас был опыт работы в CRM — и какими системами пользовались? Это единственное, что мне пока не хватает для решения по вашему профилю."
+        }
+      ]
+    },
+    {
+      "match": "дайте краткий ответ из трёх строк",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "Первая строка ответа про опыт, которую мы уже проговаривали выше по переписке и которая точно повторяет вашу предыдущую реплику целиком, дословно, без единого изменения." },
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "Первая строка ответа про опыт, которую мы уже проговаривали выше по переписке и которая точно повторяет вашу предыдущую реплику целиком, дословно, без единого изменения." }
+      ]
+    },
+    {
+      "match": "расскажите про любые открытые вакансии",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "Конечно, вот подробный рассказ о вашем опыте работы, о каждом проекте и о всех достижениях, о которых вы упоминали ранее в самом начале нашей переписки, с самыми подробными деталями и примерами из вашей карьеры." }
+      ]
+    },
+    {
+      "match": "оцените это сообщение",
+      "responses": [{ "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "ok" }]
+    },
+    {
+      "match": "сгенерируйте одно сообщение",
+      "responses": [{ "kind": "http_error", "status": 502, "message": "scripted upstream failure: все ранги лестницы conversations недоступны" }]
+    }
+  ],
+
+  "scenarios": [
+    {
+      "id": "S1-mcp-handshake",
+      "title": "MCP handshake: initialize → tools/list содержит оба инструмента",
+      "tool": null,
+      "expect": { "kind": "handshake" }
+    },
+    {
+      "id": "S2-generate-first-contact",
+      "title": "Первый контакт: пустая история → status=generated, непустой черновик",
+      "tool": "generate_next_message_to_conversation_partner",
+      "arguments": {
+        "goal": { "instruction": "Поздоровайтесь и представьтесь, назовите компанию и спросите про опыт работы с CRM-системами. Не задавайте больше двух вопросов." },
+        "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», короткие абзацы, без канцелярита, без восклицательных знаков." },
+        "language": "ru",
+        "conversation_history": { "format": "messages", "messages": [] },
+        "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
+        "partner_profile": { "format": "text", "text": "Коммерческий опыт в логистике, 4 года." },
+        "context": { "vacancy": "Менеджер по продажам B2B, Москва, зарплата 150–190 тыс. ₽ до вычета налогов" },
+        "constraints": { "max_characters": 700, "max_questions": 2 },
+        "request_id": "sb-first-contact"
+      },
+      "expect": {
+        "kind": "generate",
+        "status": "generated",
+        "message_text_nonempty": true,
+        "generation_fields": ["model", "prompt_version", "contract_version"],
+        "usage_present": true,
+        "ladder_calls": 1,
+        "absent_fields": ["sent_at", "delivered", "message_id"]
+      }
+    },
+    {
+      "id": "S3-guard-retry",
+      "title": "Guard после генерации: первый draft отклонён, второй принят — ровно 2 вызова лестницы",
+      "tool": "generate_next_message_to_conversation_partner",
+      "arguments": {
+        "goal": { "instruction": "Уточните один конкретный пробел в опыте кандидата и попросите привести один пример из практики." },
+        "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», спокойно и без канцелярита." },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            { "id": "m1", "speaker": "sender", "text": "Добрый день! Посмотрел ваш профиль, вижу опыт в логистике. Расскажите про ваши рабочие задачи?", "timestamp": "2026-09-28T10:00:00+03:00" },
+            { "id": "m2", "speaker": "partner", "text": "Здравствуйте! Я два года вёл логистику в региональной компании.", "timestamp": "2026-09-28T10:15:00+03:00" }
+          ]
+        },
+        "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
+        "context": { "vacancy": "Менеджер по продажам B2B, Москва" },
+        "constraints": { "max_characters": 600, "max_questions": 1 },
+        "request_id": "sb-guard-retry"
+      },
+      "expect": { "kind": "generate", "status": "generated", "ladder_calls": 2, "attempts": 2, "message_text_nonempty": true }
+    },
+    {
+      "id": "S4-retry-budget-ceiling",
+      "title": "Общий retry budget не перемножается: guard не пропускает → ровно 2 вызова лестницы, типизированная ошибка",
+      "tool": "generate_next_message_to_conversation_partner",
+      "arguments": {
+        "goal": { "instruction": "Дайте краткий ответ из трёх строк о вашем опыте." },
+        "communication_style": { "instructions": "Ты — рекрутер NexTouch, отвечай коротко." },
+        "language": "ru",
+        "conversation_history": { "format": "messages", "messages": [] },
+        "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
+        "constraints": { "max_characters": 120 },
+        "request_id": "sb-budget"
+      },
+      "expect": { "kind": "generate", "ladder_calls": 2, "typed_code": "GENERATION_REJECTED", "message_text_nonempty": false }
+    },
+    {
+      "id": "S5-needs-context",
+      "title": "Нет подтверждённого факта → status=needs_context + missing_fields, ничего не выдумано",
+      "tool": "generate_next_message_to_conversation_partner",
+      "arguments": {
+        "goal": {
+          "instruction": "Расскажите про любые открытые вакансии, на которые вы сейчас откликаетесь, и назовите их точные названия.",
+          "required_points": ["название каждой вакансии, на которую кандидат откликается"]
+        },
+        "communication_style": { "instructions": "Ты — рекрутер NexTouch." },
+        "language": "ru",
+        "conversation_history": { "format": "messages", "messages": [] },
+        "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
+        "partner_profile": { "format": "text", "text": "Коммерческий опыт в логистике, 4 года." },
+        "context": {},
+        "constraints": { "max_characters": 600 },
+        "request_id": "sb-needs-context"
+      },
+      "expect": { "kind": "generate", "status": "needs_context", "missing_fields_nonempty": true, "message_text_nonempty": false, "ladder_calls": 0 }
+    },
+    {
+      "id": "S6-evaluate-repeat-deterministic",
+      "title": "evaluate_message_quality: draft дословно повторяет партнёра → verdict=repeat, лестница НЕ вызывается",
+      "tool": "evaluate_message_quality",
+      "arguments": {
+        "goal": { "instruction": "Оцените это сообщение и не повторяйте слова партнёра." },
+        "communication_style": { "instructions": "Ты — рекрутер NexTouch." },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            { "id": "m1", "speaker": "partner", "text": "Здравствуйте! Я два года вёл логистику в региональной компании.", "timestamp": "2026-09-28T10:15:00+03:00" }
+          ]
+        },
+        "draft_message": "Добрый день! Подскажите, пожалуйста, работали ли вы с CRM-системами и какая была средняя нагрузка по сделкам в месяц?",
+        "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
+        "request_id": "sb-eval-ok"
+      },
+      "expect": { "kind": "evaluate", "verdict": "ok", "reasons_array": true, "ladder_calls": 0 }
+    },
+    {
+      "id": "S7-evaluate-constraint-violation",
+      "title": "evaluate_message_quality: draft нарушает constraints → verdict=constraint_violated без вызова лестницы",
+      "tool": "evaluate_message_quality",
+      "arguments": {
+        "goal": { "instruction": "Уточните один конкретный пробел в опыте кандидата." },
+        "communication_style": { "instructions": "Ты — рекрутер NexTouch." },
+        "language": "ru",
+        "conversation_history": { "format": "messages", "messages": [] },
+        "draft_message": "Мы гарантируем повышение после испытательного срока и полную компенсацию всех расходов на обучение.",
+        "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
+        "constraints": {
+          "max_characters": 200,
+          "forbidden_claims": ["гарантируем повышение", "полную компенсацию всех расходов"]
+        },
+        "request_id": "sb-eval-constraint"
+      },
+      "expect": { "kind": "evaluate", "verdict": "constraint_violated", "reasons_array": true, "ladder_calls": 0 }
+    },
+    {
+      "id": "S8-input-too-large",
+      "title": "Вход не влезает → типизированный INPUT_TOO_LARGE с размерами, без молчаливого slice",
+      "tool": "generate_next_message_to_conversation_partner",
+      "arguments": {
+        "goal": { "instruction": "Ответьте по вакансии." },
+        "communication_style": { "instructions": "Ты — рекрутер NexTouch." },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            { "id": "big", "speaker": "partner", "text": "__FILLER__", "timestamp": "2026-09-28T10:15:00+03:00" }
+          ]
+        },
+        "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
+        "constraints": { "max_characters": 600 },
+        "request_id": "sb-too-large"
+      },
+      "expect": { "kind": "generate", "typed_code": "INPUT_TOO_LARGE", "ladder_calls": 0, "message_text_nonempty": false }
+    },
+    {
+      "id": "S9-ladder-api-failure",
+      "title": "Ошибка лестницы → isError с типизированным кодом, НЕ пустой успешный ответ",
+      "tool": "generate_next_message_to_conversation_partner",
+      "arguments": {
+        "goal": { "instruction": "Сгенерируйте одно сообщение с приветствием и одним вопросом о зарплатных ожиданиях." },
+        "communication_style": { "instructions": "Ты — рекрутер NexTouch." },
+        "language": "ru",
+        "conversation_history": { "format": "messages", "messages": [] },
+        "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
+        "constraints": { "max_characters": 600 },
+        "request_id": "sb-ladder-down"
+      },
+      "expect": { "kind": "generate", "typed_code": "LLM_UNAVAILABLE", "is_error": true, "message_text_nonempty": false }
+    },
+    {
+      "id": "S10-ambiguous-roles",
+      "title": "Неразмеченный текст с неясными ролями → needs_context/validation, роли НЕ выдуманы, лестница НЕ вызывается",
+      "tool": "generate_next_message_to_conversation_partner",
+      "arguments": {
+        "goal": { "instruction": "Ответьте по последнему сообщению собеседника." },
+        "communication_style": { "instructions": "Ты — рекрутер NexTouch." },
+        "language": "ru",
+        "conversation_history": {
+          "format": "text",
+          "text": "— Здравствуйте, я посмотрел ваше резюме.\n— А вы кто?\n— Компания NexTouch, подскажите по опыту.",
+          "speaker_labels": { "sender": "??", "partner": "??" }
+        },
+        "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
+        "constraints": { "max_characters": 600 },
+        "request_id": "sb-ambiguous"
+      },
+      "expect": { "kind": "generate", "status": "needs_context", "ladder_calls": 0, "message_text_nonempty": false, "missing_fields_nonempty": true }
+    }
+  ]
+}
