@@ -18,7 +18,7 @@ Value: рекрутер получает готовый черновик пер�
    - `partner_profile` / `sender_profile` / `context` / `constraints` — опционально, каждый блок отделён от goal.
 2. Handler валидирует вход; неясные роли, конфликт goal↔constraints или отсутствие подтверждённого факта →
    `status: "needs_context"` с `missing_fields`, лестница НЕ вызывается.
-3. Иначе: рендер prompt → `POST /v1/chat/completions` к llm-ladder (ladder `conversations`).
+3. Иначе: рендер prompt → `POST /v1/chat/completions` к llm-ladder (ladder `conversation`).
 4. Guard (тот же код, что и `evaluate_message_quality`): если draft нарушает constraints/стиль → регенерация
    в пределах ОБЩЕГО retry budget; потолок → типизированная ошибка, без перемножения попыток.
 5. Ответ: `{status: "generated", message_text, warnings, request_id, generation: {model, prompt_version, contract_version}, usage, timing, input_metrics}`.

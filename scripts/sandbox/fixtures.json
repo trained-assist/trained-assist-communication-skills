@@ -46,7 +46,7 @@
     },
     {
       "match": "сгенерируйте одно сообщение",
-      "responses": [{ "kind": "http_error", "status": 502, "message": "scripted upstream failure: все ранги лестницы conversations недоступны" }]
+      "responses": [{ "kind": "http_error", "status": 502, "message": "scripted upstream failure: все ранги лестницы conversation недоступны" }]
     }
   ],
 

@@ -69,7 +69,7 @@ bash scripts/sandbox/run.sh --expect-red # этап «фича ещё не на�
   обёртки. Guard, закрывающий генерацию (общий retry budget), — тот же код, что и `evaluate_message_quality`.
   ADR-0001.
 - **Своя лестница моделей запрещена.** Только общий trained-assist-llm-ladder (`LLM_LADDER_URL`/`LLM_LADDER_TOKEN`,
-  ladder `conversations`). Никаких своих ключей, конфигов моделей и fallback-цепочек; `model_profile` — только
+  ladder `conversation`). Никаких своих ключей, конфигов моделей и fallback-цепочек; `model_profile` — только
   allowlist сервера.
 - **Шов entrypoint:** MCP-сервер обязан жить в `src/mcp/entrypoint.mjs` (переопределяется
   `COMMUNICATION_MCP_ENTRYPOINT`), имя в `initialize` — `trained-assist-communication-skills`. Песочница и CI

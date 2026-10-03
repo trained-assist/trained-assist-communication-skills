@@ -11,7 +11,7 @@ import { renderWriterPrompt } from './prompt.mjs';
 
 export const CONTRACT_VERSION = 'v1';
 export const PROMPT_VERSION = 'p1';
-export const LADDER_NAME = 'conversations';
+export const LADDER_NAME = 'conversation';
 
 // Общий retry budget: один счётчик на весь путь generate + guard, не перемножается
 // между адаптером, MCP и лестницей (review #125, R3).
