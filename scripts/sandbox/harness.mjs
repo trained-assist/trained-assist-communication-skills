@@ -279,7 +279,7 @@ async function selfCheck(fixtures) {
     const res = await fetch(`${ladder.url}/v1/chat/completions`, {
       method: 'POST',
       headers: { Authorization: 'Bearer sandbox-token', 'Content-Type': 'application/json', 'x-ladder-app': 'sandbox-probe' },
-      body: JSON.stringify({ model: 'conversations', messages: [{ role: 'user', content: 'поздоровайтесь и представьтесь' }], temperature: 0.7, max_tokens: 800, ladder_timeout_ms: 20000 }),
+      body: JSON.stringify({ model: 'conversation', messages: [{ role: 'user', content: 'поздоровайтесь и представьтесь' }], temperature: 0.7, max_tokens: 800, ladder_timeout_ms: 20000 }),
     });
     const data = await res.json();
     const content = data?.choices?.[0]?.message?.content;

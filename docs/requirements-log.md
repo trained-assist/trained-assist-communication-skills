@@ -15,7 +15,7 @@
 | R8 | `model_profile` — только allowlist, заданный сервером; пин модели для bench — служебный контур | review #125; allowlist в коде (`MODEL_PROFILES`), contract test — шаг «Полная локальная проверка» | in-progress |
 | R9 | Телеметрия без PII: метрики без текста диалогов/резюме; replay-corpus — отдельно с обезличиванием | review #125; код телеметрии | done |
 | R10 | Feature toggle legacy/communication с явным помеченным fallback; откат не меняет отправленные сообщения | core/HH (отдельные планы agent#2034, hh-skill#125) | planned |
-| R11 | Выбор модели — только общий llm-ladder (ladder `conversations`); собственная лестница запрещена (ADR-0001) | песочница: фейковая лестница по реальному HTTP-контракту | done |
+| R11 | Выбор модели — только общий llm-ladder (ladder `conversation`); собственная лестница запрещена (ADR-0001) | песочница: фейковая лестница по реальному HTTP-контракту | done |
 | R12 | MCP entrypoint `initialize`/`tools/list`/`tools/call` в `src/mcp/entrypoint.mjs`, оба тула со схемами | S1 | done |
 | R13 | Граница: нет HH tokens и HH API; выбор шага/ATS/отправка — у HH | архитектурный обзор (R1–R10 hh-skill#125) | done |
 | R14 | CLI contract smoke — прогон контракта без хоста | команды в README | planned |
