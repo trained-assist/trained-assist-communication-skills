@@ -1,0 +1,106 @@
+name: CI
+on:
+  # Every push (feature branches included) so a branch shows status before its PR exists;
+  # pull_request covers PR updates and forks.
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: comm-ci-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+jobs:
+  # Static check: every .mjs/.js parses, skeleton docs are present.
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check (node --check)
+        run: |
+          set -euo pipefail
+          files=$(find src scripts -name '*.mjs' -o -name '*.js' 2>/dev/null || true)
+          if [ -z "$files" ]; then echo "no source files yet (pre-handler skeleton)"; exit 0; fi
+          for f in $files; do node --check "$f"; echo "ok $f"; done
+      - name: Skeleton docs present
+        run: |
+          set -euo pipefail
+          test -f README.md
+          test -L CLAUDE.md && test "$(readlink CLAUDE.md)" = "README.md"
+          test -f docs/spec.md
+          test -f docs/requirements-log.md
+          ls docs/adr/ADR-*.md >/dev/null
+          ls docs/user-scenarios/*.md >/dev/null
+          echo "docs ok"
+  # Unit/contract tests: the repo grows real test files (step «Полная локальная проверка»);
+  # until then this job says so explicitly instead of pretending a suite ran.
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run test files (node --test)
+        run: |
+          set -euo pipefail
+          files=$(find test tests -name '*.test.mjs' -o -name '*.test.js' 2>/dev/null || true)
+          if [ -z "$files" ]; then
+            echo "нет test-файлов — каркас без юнит-набора; песочница (job sandbox) несёт проверку сценария"
+            exit 0
+          fi
+          node --test $files
+  # The sandbox IS the acceptance suite. Stage-aware on purpose:
+  #  - src/mcp/entrypoint.mjs absent → --expect-red (harness green, scenario red = feature not written yet)
+  #  - entrypoint present → strict, exit 0 required
+  # So the day the handler lands, CI tightens itself — nothing silently stays red.
+  sandbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Sandbox (stage-aware)
+        run: |
+          set -uo pipefail
+          if [ -f src/mcp/entrypoint.mjs ]; then
+            echo "entrypoint есть → строгий режим: песочница обязана быть зелёной (exit 0)"
+            bash scripts/sandbox/run.sh
+            exit $?
+          fi
+          echo "entrypoint ещё нет → режим --expect-red (этап плана: харнесс зелёный, сценарий красный)"
+          rc=0
+          bash scripts/sandbox/run.sh --expect-red || rc=$?
+          # 10 = харнесс зелёный, сценарий красный: ожидаемое состояние этапа.
+          # 0 (всё зелёно) здесь тоже ошибка — значит сценарий стал зелёным без entrypoint, это рассинхрон.
+          if [ "$rc" -eq 10 ]; then echo "stage ok: ожидаемый красный сценарий"; exit 0; fi
+          exit "$rc"
+  # Single required check for branch protection.
+  ci:
+    name: ci
+    needs: [check, tests, sandbox]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require check, tests and sandbox to succeed
+        env:
+          CHECK_RESULT: ${{ needs.check.result }}
+          TESTS_RESULT: ${{ needs.tests.result }}
+          SANDBOX_RESULT: ${{ needs.sandbox.result }}
+        run: test "$CHECK_RESULT" = success && test "$TESTS_RESULT" = success && test "$SANDBOX_RESULT" = success
