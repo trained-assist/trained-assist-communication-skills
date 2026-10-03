@@ -1,0 +1,21 @@
+{
+  "name": "trained-assist-communication-skills",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker: один MCP-метод написания следующего сообщения в диалоге (write-next-message), без VM",
+  "scripts": {
+    "check": "node --check src/index.mjs && node --check src/handler.mjs && node --check src/prompt.mjs && node --check src/ladder.mjs && node --check src/dialog-state.mjs && node --check src/mcp/protocol.mjs && node --check src/mcp/entrypoint.mjs",
+    "test": "node --test test/*.test.mjs",
+    "sandbox": "bash scripts/sandbox/run.sh",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "gate": "npm run check && npm test && npm run sandbox"
+  },
+  "devDependencies": {
+    "wrangler": "^4.86.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

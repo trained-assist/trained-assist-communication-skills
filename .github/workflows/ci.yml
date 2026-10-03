@@ -40,8 +40,7 @@ jobs:
           ls docs/adr/ADR-*.md >/dev/null
           ls docs/user-scenarios/*.md >/dev/null
           echo "docs ok"
-  # Unit/contract tests: the repo grows real test files (step «Полная локальная проверка»);
-  # until then this job says so explicitly instead of pretending a suite ran.
+  # Unit/contract tests: dialog state, guard, and the Worker HTTP/MCP door.
   tests:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -52,15 +51,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install
+        run: npm ci
+      - name: Syntax check (node --check)
+        run: npm run check
       - name: Run test files (node --test)
-        run: |
-          set -euo pipefail
-          files=$(find test tests -name '*.test.mjs' -o -name '*.test.js' 2>/dev/null || true)
-          if [ -z "$files" ]; then
-            echo "нет test-файлов — каркас без юнит-набора; песочница (job sandbox) несёт проверку сценария"
-            exit 0
-          fi
-          node --test $files
+        run: npm test
   # The sandbox IS the acceptance suite. Stage-aware on purpose:
   #  - src/mcp/entrypoint.mjs absent → --expect-red (harness green, scenario red = feature not written yet)
   #  - entrypoint present → strict, exit 0 required

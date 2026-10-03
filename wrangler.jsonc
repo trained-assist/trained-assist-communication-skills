@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "trained-assist-communication-skills",
+  "main": "src/index.mjs",
+  "compatibility_date": "2025-10-01",
+  "workers_dev": true,
+
+  // No D1/Vectorize/AI binding on purpose. The method is stateless: it holds no
+  // dialog state between calls and needs no vector index. Dialog state is derived
+  // from the history the caller passes in, every time (issue #6 §5 — the original
+  // history stays the source of truth; nothing here is a second owner of it).
+  // Adding a database before there is a measured need is exactly the cost the
+  // owner called out: migrations + auth + a second durable state owner.
+  //
+  // Observability off by default: structured stderr logs carry ids and sizes,
+  // never dialog text (PII), and Workers Logs already capture console output.
+
+  // Secrets (wrangler secret put):
+  //   COMMUNICATION_TOKEN — bearer for every route except /health
+  //   LLM_LADDER_URL     — https://llm-ladder.trainedassist.store
+  //   LLM_LADDER_TOKEN   — shared ladder token (model owner stays the ladder)
+}
