@@ -41,7 +41,10 @@ export const INTENT_PROMPT_VERSION = 'ip1';
 //
 // `LLM_LADDER_NAME` переопределяет имя для сравнения моделей (issue #10 §7:
 // «конкретную модель выбрать сравнением размеченных кейсов»). Прод без флага.
-export const INTENT_LADDER_NAME = process.env.LLM_LADDER_NAME || 'service:classify';
+// globalThis, а не process.env: в Cloudflare Worker нет process (nodejs_compat не
+// включён), и деплой падал с «process is not defined». В Node globalThis.process
+// существует, поэтому локальные замеры переопределением по-прежнему работают.
+export const INTENT_LADDER_NAME = globalThis.process?.env?.LLM_LADDER_NAME || 'service:classify';
 
 // Общий retry budget метода: одна попытка + максимум одна ремонтная. Всё.
 // Множить его с retry лестницы нельзя — бюджет принадлежит методу (ADR-0001).

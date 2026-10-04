@@ -2,7 +2,10 @@
 
 ТЗ: [issue #10](https://github.com/trained-assist/trained-assist-communication-skills/issues/10).
 Первый метод — [spec.md](spec.md) (`generate_next_message_to_conversation_partner`).
-Оба живут в одном Worker'е, говорят по одному протоколу и не имеют общей логики.
+Методы живут в одном Worker'е и говорят по одному протоколу. Публичный контракт
+`resolve_user_intent` остаётся ровно `{ user_goal, decision }`. Его закрытый
+список решений не используется `evaluate_next_goal`: тот формулирует открытую
+следующую цель по общей цели диалога и извлечённому состоянию.
 
 ## 1. Что делает метод
 
@@ -354,7 +357,7 @@ npm run dev           # wrangler dev на :8787
 
 Живой прогон на workerd (проверено 04.10.2026): `/health` → `ready`, REST
 `/v1/intents/resolve` → 200 с двумя полями и диагностикой в заголовках, MCP
-`tools/list` → оба инструмента, `tools/call resolve_user_intent` → `structuredContent`
+`tools/list` → список инструментов, `tools/call resolve_user_intent` → `structuredContent`
 с двумя полями и `_meta`. Секреты организации не нужны: лестница подменяется локально.
 
 **Чего офлайн-проверки не доказывает.** Что модель выбирает правильный вариант.

@@ -1,10 +1,10 @@
 # trained-assist-communication-skills
 
-Общий генератор следующего сообщения в диалоге и определение цели пользователя с выбором из заданных решений. Первый потребитель — рекрутинг; далее sales и другие домены.
+Общий state-first контур для диалогов: извлечение состояния, формулирование следующей открытой цели и генерация сообщения. Отдельный resolver выбирает из закрытого списка там, где этого требует вызывающая сторона. Первый потребитель — рекрутинг; далее sales и другие домены.
 
 **Рантайм: Cloudflare Worker** (VM на GCP выводится из эксплуатации — agent#2053, решение владельца 03.10.2026). Методы не зависят от VM: ни файлов, ни процессов, ни локальных секретов. Модель — через общий `trained-assist-llm-ladder`, который сам является Worker'ом, поэтому путь запроса Worker→Worker.
 
-Контракты: [docs/spec.md](docs/spec.md) (writer) · [docs/resolve-user-intent-contract.md](docs/resolve-user-intent-contract.md) (resolver) · ТЗ: [#6](https://github.com/trained-assist/trained-assist-communication-skills/issues/6) и [#10](https://github.com/trained-assist/trained-assist-communication-skills/issues/10) · эпик — [#1](https://github.com/trained-assist/trained-assist-communication-skills/issues/1)
+Контракты: [docs/spec.md](docs/spec.md) (writer) · [docs/extract-conversation-state-contract.md](docs/extract-conversation-state-contract.md) (state) · [docs/evaluate-next-goal-contract.md](docs/evaluate-next-goal-contract.md) (goal) · [docs/resolve-user-intent-contract.md](docs/resolve-user-intent-contract.md) (resolver) · ТЗ: [#6](https://github.com/trained-assist/trained-assist-communication-skills/issues/6), [#10](https://github.com/trained-assist/trained-assist-communication-skills/issues/10) и эпик #11
 
 ## Инструменты MCP
 
@@ -17,6 +17,24 @@
 - **Состояние диалога** (`src/dialog-state.mjs`) — извлекается из ПОЛНОЙ истории детерминированно, без вызова модели: отвеченные вопросы, отказы, незакрытые вопросы собеседника, обещания, условия. Каждый факт — дословная цитата с id сообщения, поэтому отрицание не теряется («офис не рассматриваю» не превращается в «рассматриваю офис»).
 - **Запрет контакта** → `no_message_needed`, модель НЕ вызывается. Это решение, а не подсказка в промпте.
 - **Guard** — детерминированный, не тратит модель: ограничения, повтор, переспрос решённого вопроса, выдуманное время. При отклонении — повтор с объяснением, ЧТО не так (иначе модель повторяет ту же ошибку и бюджет сгорает впустую). Общий retry budget = 2 попытки всего.
+
+### `extract_conversation_state` (contract v1)
+
+Извлекает структурированное состояние из полной истории по переданной `state_schema`. Не выбирает следующую цель, не пишет сообщение и не отправляет ничего.
+
+- **Ограниченный schema subset.** Поддерживаются только простые JSON Schema-подобные поля (`type`, `properties`, `required`, `additionalProperties:false`, `items`, `enum`, min/max bounds, `description`). Unsupported schema падает до вызова модели.
+- **Строгий JSON после модели.** Provider `response_format` используется, но не считается гарантией: ответ парсится и валидируется локально; одна ремонтная попытка, затем `STATE_REJECTED`.
+- **Без раннего сжатия в MVP.** История передаётся целиком; превышение бюджета даёт `INPUT_TOO_LARGE` с размерами.
+- **Свежесть.** `conversation_revision` возвращается в теле и диагностике. Если за время вызова пришло новое сообщение, потребитель обязан отбросить старый результат.
+
+### `evaluate_next_goal` (contract v1)
+
+Формулирует открытую следующую цель по верхнеуровневой цели диалога и state. Например: «уточнить, с какими CRM кандидат работал и какие задачи в них выполнял».
+
+- `reason` необязателен; пустое значение допустимо.
+- `wait`, `no_matching_option` и явный запрет контакта возвращают `goal:null`; потребитель останавливается до writer.
+- Ревизия диалога возвращается в ответе для отбрасывания устаревшего результата.
+- `resolve_user_intent` остаётся отдельным методом для задач, где вызывающая сторона действительно передаёт закрытый список решений.
 
 ### `resolve_user_intent` (contract v1)
 
@@ -42,6 +60,8 @@
 | `GET /health` | публичный, без токена; честно сообщает `not_configured`, если нет ladder-конфига |
 | `POST /mcp` | MCP streamable HTTP (`initialize` / `tools/list` / `tools/call`) |
 | `POST /v1/dialogs/next-message` | writer по REST (issue #6 §1) |
+| `POST /v1/conversations/state/extract` | state extractor по REST (epic #11) |
+| `POST /v1/conversations/next-goal` | выбор следующей цели по state (epic #11) |
 | `POST /v1/intents/resolve` | resolver по REST (issue #10 §1) |
 
 Все, кроме `/health`, требуют `Authorization: Bearer <COMMUNICATION_TOKEN>`.
@@ -63,7 +83,7 @@ npm run dev           # wrangler dev на :8787
 ## Границы
 
 - Нет HH tokens и HH API; выбор шага, ATS, хранение черновика, preview и отправка — у потребителя.
-- Своя лестница моделей запрещена (ADR-0001): только общий `llm-ladder`. Writer ходит в `conversation`, резолвер — в `service:classify`: он классифицирует, а не пишет текст. У `conversation` 19% отказов на 24 ч (осознанный 402 на OpenRouter), у `service:classify` — 0.
+- Своя лестница моделей запрещена (ADR-0001): только общий `llm-ladder`. Writer ходит в `conversation`, классификационные/JSON-методы — в ladder-профиль сервиса (`service:classify` по умолчанию, с переопределением через конфиг окружения), без pin конкретной модели.
 - Нет D1/Vectorize/AI-биндинга: методы stateless, состояние выводится из переданного входа каждый раз. База понадобится только когда появится измеренная потребность в кэше — см. «Чего здесь нет и почему».
 
 ## Чего здесь нет и почему
@@ -98,10 +118,12 @@ npm run dev           # wrangler dev на :8787
 ## Статус
 
 - [x] Рантайм: Cloudflare Worker, без VM
-- [x] Один канонический MCP-инструмент + REST-дверь над тем же handler'ом
+- [x] Канонические MCP-инструменты + REST-двери над теми же handler'ами
 - [x] Состояние диалога: отвеченные/отказанные вопросы, запрет контакта, обещания, условия
 - [x] Guard: ограничения, повтор, переспрос решённого, выдуманное время; повтор с объяснением
 - [x] Второй метод `resolve_user_intent`: двухполевой контракт, dynamic enum, guard, приоритет, манифест≠содержимое
+- [x] Epic #11 S0/S1: ADR state-first цепочки и MVP `extract_conversation_state`
+- [x] Epic #11: `evaluate_next_goal` формулирует открытую цель по objective + state; terminal outcomes останавливают цепочку до writer
 - [x] Сжатие длинного ввода: первое + последнее предложение + релевантное из середины, без LLM
 - [x] 173 юнит-теста + песочница 35/35 + корпус 75/75
 - [x] Живая проверка на workerd: /health, REST и MCP для обоих методов

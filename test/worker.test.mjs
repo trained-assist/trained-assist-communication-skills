@@ -93,14 +93,20 @@ test('MCP initialize через HTTP отдаёт сервер и протоко
   assert.ok(body.result.capabilities.tools);
 });
 
-test('MCP tools/list отдаёт оба канонических инструмента со схемами', async () => {
+test('MCP tools/list отдаёт канонические инструменты со схемами', async () => {
   const res = await call('/mcp', { method: 'POST', headers: authed(), body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) });
   const { result } = await res.json();
-  assert.equal(result.tools.length, 2);
-  assert.deepEqual(result.tools.map((t) => t.name), ['generate_next_message_to_conversation_partner', 'resolve_user_intent']);
+  assert.equal(result.tools.length, 4);
+  assert.deepEqual(result.tools.map((t) => t.name), ['generate_next_message_to_conversation_partner', 'extract_conversation_state', 'evaluate_next_goal', 'resolve_user_intent']);
   for (const t of result.tools) {
     assert.ok(t.inputSchema && t.description, `${t.name}: нужны inputSchema и description`);
   }
+  const state = result.tools.find((t) => t.name === 'extract_conversation_state');
+  assert.deepEqual(state.outputSchema.required, ['state']);
+  assert.equal(state.outputSchema.additionalProperties, false);
+  assert.match(state.description, /Does not choose the next goal/i);
+  const goal = result.tools.find((t) => t.name === 'evaluate_next_goal');
+  assert.deepEqual(goal.outputSchema.required.slice(0, 4), ['status', 'requires_message', 'goal', 'reason']);
   // The resolver's output schema is the two-field contract, published for clients.
   const intent = result.tools.find((t) => t.name === 'resolve_user_intent');
   assert.deepEqual(intent.outputSchema.required, ['user_goal', 'decision']);
@@ -197,6 +203,44 @@ const INTENT_ARGS = {
 
 const INTENT_OK = { user_goal: 'Подобрать актуальные вакансии по резюме, не отправляя отклики', decision: 'start_opencode' };
 
+const STATE_ARGS = {
+  request_id: 'r-state-1',
+  conversation_revision: 'history-v7',
+  conversation_history: {
+    format: 'messages',
+    messages: [
+      { id: 'm1', speaker: 'sender', text: 'Подскажите опыт с Python?' },
+      { id: 'm2', speaker: 'partner', text: 'Да, 5 лет. Но переезд не рассматриваю.' },
+    ],
+  },
+  state_schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['constraints'],
+    properties: {
+      constraints: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['quote', 'source_message_id'],
+          properties: {
+            quote: { type: 'string' },
+            source_message_id: { type: 'string' },
+          },
+        },
+      },
+    },
+  },
+};
+
+const STATE_OK = { state: { constraints: [{ quote: 'переезд не рассматриваю', source_message_id: 'm2' }] } };
+const GOAL_ARGS = {
+  request_id: 'r-goal-1', conversation_revision: 'history-v7',
+  conversation_state: { constraints: [{ quote: 'переезд не рассматриваю', source_message_id: 'm2' }] },
+  conversation_objective: 'Понять, подходит ли кандидат по опыту работы с CRM',
+};
+
 /** Stub the shared ladder so the REST door can be exercised end to end, offline. */
 function stubLadder(replies) {
   const calls = [];
@@ -222,6 +266,94 @@ test('POST /v1/intents/resolve без токена → 401', async () => {
   const res = await call('/v1/intents/resolve', { method: 'POST', body: JSON.stringify(INTENT_ARGS) });
   assert.equal(res.status, 401);
   assert.equal((await res.json()).error.code, 'UNAUTHORIZED');
+});
+
+// ───────────────────────── /v1/conversations/state/extract (epic #11) ─────────
+
+test('POST /v1/conversations/next-goal без токена → 401', async () => {
+  const res = await call('/v1/conversations/next-goal', { method: 'POST', body: JSON.stringify(GOAL_ARGS) });
+  assert.equal(res.status, 401);
+});
+
+test('POST /v1/conversations/next-goal: open goal and revision through REST', async () => {
+  const stub = stubLadder([{ content: '{"status":"goal_ready","goal":{"instruction":"Уточните опыт работы с CRM и основные задачи"}}' }]);
+  try {
+    const res = await call('/v1/conversations/next-goal', { method: 'POST', headers: authed(), body: JSON.stringify(GOAL_ARGS) });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.status, 'goal_ready');
+    assert.equal(body.requires_message, true);
+    assert.equal(body.goal.instruction, 'Уточните опыт работы с CRM и основные задачи');
+    assert.equal(body.conversation_revision, 'history-v7');
+    assert.equal(res.headers.get('x-contract-version'), 'v1');
+  } finally { stub.restore(); }
+});
+
+test('MCP tools/call evaluate_next_goal: terminal wait returns no writer goal', async () => {
+  const stub = stubLadder([{ content: '{"status":"wait"}' }]);
+  try {
+    const res = await call('/mcp', {
+      method: 'POST', headers: authed(),
+      body: JSON.stringify({ jsonrpc: '2.0', id: 19, method: 'tools/call', params: { name: 'evaluate_next_goal', arguments: GOAL_ARGS } }),
+    });
+    const { result } = await res.json();
+    assert.equal(result.structuredContent.status, 'wait');
+    assert.equal(result.structuredContent.requires_message, false);
+    assert.equal(result.structuredContent.goal, null);
+    assert.equal(stub.calls.length, 1);
+  } finally { stub.restore(); }
+});
+
+test('POST /v1/conversations/state/extract без токена → 401', async () => {
+  const res = await call('/v1/conversations/state/extract', { method: 'POST', body: JSON.stringify(STATE_ARGS) });
+  assert.equal(res.status, 401);
+  assert.equal((await res.json()).error.code, 'UNAUTHORIZED');
+});
+
+test('GET /v1/conversations/state/extract → 405', async () => {
+  const res = await call('/v1/conversations/state/extract', { headers: authed() });
+  assert.equal(res.status, 405);
+});
+
+test('POST /v1/conversations/state/extract с unsupported schema → 400 VALIDATION_ERROR', async () => {
+  const res = await call('/v1/conversations/state/extract', {
+    method: 'POST',
+    headers: authed(),
+    body: JSON.stringify({ ...STATE_ARGS, state_schema: { ...STATE_ARGS.state_schema, oneOf: [] } }),
+  });
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).error.code, 'VALIDATION_ERROR');
+});
+
+test('POST /v1/conversations/state/extract: echoes conversation_revision for stale-result guard', async () => {
+  const stub = stubLadder([{ content: JSON.stringify(STATE_OK) }]);
+  try {
+    const res = await call('/v1/conversations/state/extract', { method: 'POST', headers: authed(), body: JSON.stringify(STATE_ARGS) });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.deepEqual(body.state, STATE_OK.state);
+    assert.equal(body.conversation_revision, 'history-v7');
+    assert.equal(res.headers.get('x-contract-version'), 'v1');
+    const diag = JSON.parse(res.headers.get('x-communication-diagnostics'));
+    assert.equal(diag.conversation_revision, 'history-v7');
+    assert.equal(diag.input_metrics.coverage.truncated, false);
+    assert.ok(!res.headers.get('x-communication-diagnostics').includes('Подскажите опыт'));
+  } finally { stub.restore(); }
+});
+
+test('MCP tools/call extract_conversation_state: structuredContent has state and _meta diagnostics', async () => {
+  const stub = stubLadder([{ content: JSON.stringify(STATE_OK) }]);
+  try {
+    const res = await call('/mcp', {
+      method: 'POST', headers: authed(),
+      body: JSON.stringify({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'extract_conversation_state', arguments: STATE_ARGS } }),
+    });
+    const { result } = await res.json();
+    assert.equal(result.isError, undefined);
+    assert.deepEqual(result.structuredContent.state, STATE_OK.state);
+    assert.equal(result.structuredContent.conversation_revision, 'history-v7');
+    assert.equal(result._meta.conversation_revision, 'history-v7');
+  } finally { stub.restore(); }
 });
 
 test('GET /v1/intents/resolve → 405', async () => {
@@ -341,3 +473,13 @@ test('MCP tools/call неизвестного инструмента → UNKNOWN
   assert.equal(result.isError, true);
   assert.equal(result.structuredContent.error.code, 'UNKNOWN_TOOL');
 });
+
+ test('dedicated HH token preserves existing consumer bearer', async () => {
+  const env={...ENV, HH_COMMUNICATION_TOKEN:'hh-fixture-only'};
+  for(const token of [TOKEN,'hh-fixture-only']) {
+    const res=await worker.fetch(new Request('https://example.test/mcp',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/list'})}),env);
+    assert.equal(res.status,200);
+  }
+  const res=await worker.fetch(new Request('https://example.test/mcp',{method:'POST',headers:{Authorization:'Bearer wrong','Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/list'})}),env);
+  assert.equal(res.status,401);
+ });

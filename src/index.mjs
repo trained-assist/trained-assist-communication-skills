@@ -19,6 +19,8 @@
 
 import { generateNextMessage, CONTRACT_VERSION, PROMPT_VERSION, MAX_ATTEMPTS } from './handler.mjs';
 import { resolveUserIntent, INTENT_CONTRACT_VERSION, INTENT_PROMPT_VERSION } from './intent-handler.mjs';
+import { extractConversationState, STATE_CONTRACT_VERSION, STATE_PROMPT_VERSION } from './state-handler.mjs';
+import { evaluateNextGoal, GOAL_CONTRACT_VERSION } from './goal-handler.mjs';
 import { TOOLS, SERVER_NAME, SERVER_VERSION, PROTOCOL_VERSION, handleMcpMessage } from './mcp/protocol.mjs';
 import { toolDeps } from './mcp/registry.mjs';
 
@@ -49,15 +51,17 @@ function wantsSse(request) {
  * authorised" sends the caller hunting for a token that does not exist.
  */
 function authorized(request, env) {
-  const token = env.COMMUNICATION_TOKEN;
-  if (!token) return { ok: false, status: 500, code: 'NOT_CONFIGURED', message: 'COMMUNICATION_TOKEN не задан (wrangler secret put COMMUNICATION_TOKEN)' };
+  const tokens = [env.COMMUNICATION_TOKEN, env.HH_COMMUNICATION_TOKEN].filter(Boolean);
+  if (!tokens.length) return { ok: false, status: 500, code: 'NOT_CONFIGURED', message: 'COMMUNICATION_TOKEN не задан (wrangler secret put COMMUNICATION_TOKEN)' };
   const got = String(request.headers.get('authorization') || '');
-  const expected = `Bearer ${token}`;
-  // Length-equal compare; both sides are fixed-shape bearer tokens.
-  if (got.length !== expected.length) return { ok: false, status: 401, code: 'UNAUTHORIZED', message: 'unauthorized' };
-  let diff = 0;
-  for (let i = 0; i < expected.length; i += 1) diff |= got.charCodeAt(i) ^ expected.charCodeAt(i);
-  return diff === 0 ? { ok: true } : { ok: false, status: 401, code: 'UNAUTHORIZED', message: 'unauthorized' };
+  let matched = false;
+  for (const token of tokens) {
+    const expected = `Bearer ${token}`;
+    let diff = got.length ^ expected.length;
+    for (let i = 0; i < expected.length; i += 1) diff |= (got.charCodeAt(i) || 0) ^ expected.charCodeAt(i);
+    matched = matched || diff === 0;
+  }
+  return matched ? { ok: true } : { ok: false, status: 401, code: 'UNAUTHORIZED', message: 'unauthorized' };
 }
 
 async function readJson(request) {
@@ -79,6 +83,7 @@ function serveHealth(env) {
     contract_version: CONTRACT_VERSION,
     prompt_version: PROMPT_VERSION,
     ladder_configured: configured,
+    capabilities: ['conversation-state-context-v1', 'free-goal-material-execution-v1'],
   });
 }
 
@@ -88,7 +93,7 @@ export default {
 
     if (url.pathname === '/health') return serveHealth(env);
     if (url.pathname === '/') {
-      return json(200, { service: SERVER_NAME, contract_version: CONTRACT_VERSION, endpoints: ['/health', '/mcp', '/v1/dialogs/next-message', '/v1/intents/resolve'] });
+      return json(200, { service: SERVER_NAME, contract_version: CONTRACT_VERSION, endpoints: ['/health', '/mcp', '/v1/dialogs/next-message', '/v1/conversations/state/extract', '/v1/conversations/next-goal', '/v1/intents/resolve'] });
     }
 
     const auth = authorized(request, env);
@@ -105,6 +110,31 @@ export default {
       // contract, so MCP clients get the same information.
       const httpStatus = out.isError ? statusForCode(out.data?.error?.code) : 200;
       return json(httpStatus, out.data, { 'x-contract-version': CONTRACT_VERSION });
+    }
+
+    // ── REST door: extract_conversation_state (epic #11) ─────────────────────
+    if (url.pathname === '/v1/conversations/state/extract') {
+      if (request.method !== 'POST') return json(405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'используй POST' } });
+      const body = await readJson(request);
+      if (!body.ok) return json(400, { error: { code: 'INVALID_INPUT', message: body.message, retryable: false } });
+      const out = await extractConversationState(body.value, env);
+      if (out.isError) {
+        return json(statusForCode(out.data?.error?.code), out.data, { 'x-contract-version': STATE_CONTRACT_VERSION });
+      }
+      return json(200, out.data, {
+        'x-contract-version': STATE_CONTRACT_VERSION,
+        'x-communication-request-id': out.meta?.request_id ?? null,
+        'x-communication-diagnostics': JSON.stringify(out.meta ?? {}),
+      });
+    }
+
+    if (url.pathname === '/v1/conversations/next-goal') {
+      if (request.method !== 'POST') return json(405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'используй POST' } });
+      const body = await readJson(request);
+      if (!body.ok) return json(400, { error: { code: 'INVALID_INPUT', message: body.message, retryable: false } });
+      const out = await evaluateNextGoal(body.value, env);
+      if (out.isError) return json(statusForCode(out.data?.error?.code), out.data, { 'x-contract-version': GOAL_CONTRACT_VERSION });
+      return json(200, out.data, { 'x-contract-version': GOAL_CONTRACT_VERSION, 'x-communication-request-id': out.meta?.request_id ?? null, 'x-communication-diagnostics': JSON.stringify(out.meta ?? {}) });
     }
 
     // ── REST door: resolve_user_intent (issue #10 §1) ─────────────────────────
@@ -166,10 +196,13 @@ function statusForCode(code) {
       return 503;
     case 'GENERATION_REJECTED':
     case 'INTENT_REJECTED':
+    case 'STATE_REJECTED':
+    case 'GOAL_REJECTED':
       return 422;
     case 'MODEL_OUTPUT_INVALID':
       return 502;
     case 'TOO_MANY_DECISION_OPTIONS':
+    case 'TOO_MANY_GOAL_OPTIONS':
       return 400;
     default:
       return 500;
