@@ -26,7 +26,22 @@ import { TypedError, logEvent } from './typed-error.mjs';
 
 export const INTENT_CONTRACT_VERSION = 'v1';
 export const INTENT_PROMPT_VERSION = 'ip1';
-export const INTENT_LADDER_NAME = 'conversation';
+
+// ЛЕСТНИЦА РЕЗОЛВЕРА — НЕ ЛЕСТНИЦА WRITER'А.
+//
+// Writer пишет текст пользователю, ему нужен живой ответ и качество формулировки:
+// лестница `conversation`. Резолвер не пишет ничего — он выбирает один id из
+// закрытого списка и формулирует цель. Это классификация, и лестница под неё уже
+// настроена: `service:classify` — free-first (все ранг-и бесплатные), 225 вызовов
+// за 24 ч с нулём сбоев. У `conversation` первые два ранг-а платные OpenRouter, и
+// там осознанно ловится 402 «Insufficient credits» — то есть 19% отказов на 24 ч.
+//
+// Решение владельца 17.10.2026: резолверу не нужен `conversation`, ему нужен
+// `classify`. Проверено корпусом на живой лестнице — цифры в docs.
+//
+// `LLM_LADDER_NAME` переопределяет имя для сравнения моделей (issue #10 §7:
+// «конкретную модель выбрать сравнением размеченных кейсов»). Прод без флага.
+export const INTENT_LADDER_NAME = process.env.LLM_LADDER_NAME || 'service:classify';
 
 // Общий retry budget метода: одна попытка + максимум одна ремонтная. Всё.
 // Множить его с retry лестницы нельзя — бюджет принадлежит методу (ADR-0001).
