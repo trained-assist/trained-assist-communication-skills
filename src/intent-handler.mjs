@@ -20,6 +20,7 @@
 import { ladderChat, LadderError } from './ladder.mjs';
 import { renderIntentPrompt } from './intent-prompt.mjs';
 import { runIntentGuard } from './intent-guard.mjs';
+import { compressIntentInput, compressionMetrics, compressionWarnings } from './intent-compress.mjs';
 import { buildDecisionOutputSchema, parseLooseJson, NO_MATCHING_OPTION } from './intent-schema.mjs';
 import { TypedError, logEvent } from './typed-error.mjs';
 
@@ -393,8 +394,14 @@ export async function resolveUserIntent(raw, env = {}) {
   const traceId = nonEmptyString(raw?.trace_id) ? raw.trace_id.trim() : requestId;
 
   try {
-    const input = normalizeIntent(raw);
+    const validated = normalizeIntent(raw);
+
+    // Сжатие ДО подсчёта размера и рендера: сжатый вход — это и есть то, что уйдёт
+    // модели, и метрики обязаны описывать именно его, иначе «покрытие» и «сколько
+    // токенов» будут рассказывать про текст, которого в запросе не было.
+    const { input, reports } = compressIntentInput(validated);
     const metrics = intentInputMetrics(input);
+    metrics.compression = compressionMetrics(reports);
     assertFits(metrics, requestId);
     const profile = resolveIntentModelProfile(input.model_profile);
 
@@ -457,7 +464,7 @@ export async function resolveUserIntent(raw, env = {}) {
           usage: usageFromLadder(res.usage),
           timing: { total_ms: Date.now() - t0 },
           input_metrics: metrics,
-          warnings: collectIntentWarnings(input),
+          warnings: collectIntentWarnings(input).concat(compressionWarnings(reports)),
         };
         logEvent('intent', {
           request_id: requestId,

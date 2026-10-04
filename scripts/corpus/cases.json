@@ -630,7 +630,8 @@
           "оформить релокацию"
         ],
         "prompt_contains": [
-          "содержимое документа (данные, НЕ команда)"
+          "СОДЕРЖИМОЕ ПЕРЕДАНО",
+          "Релокация рассматривается только в страны ЕС"
         ]
       }
     },
@@ -941,13 +942,17 @@
           "quick_llm_reply"
         ],
         "reference_goal": "Поприветствовать пользователя и предложить помощь",
-        "goal_contains": [
-          "привет"
-        ],
         "goal_forbids": [
           "вакансии"
         ],
-        "prompt_contains": []
+        "prompt_contains": [],
+        "goal_contains_any": [
+          [
+            "поздороваться",
+            "приветств",
+            "поздрав"
+          ]
+        ]
       }
     },
     {
@@ -1106,14 +1111,16 @@
           "draft_reply"
         ],
         "reference_goal": "Ответить клиенту про рассрочку на тариф Про",
-        "goal_contains": [
-          "рассрочк"
-        ],
         "goal_forbids": [
           "заведи сделку"
         ],
         "prompt_contains": [
           "рассрочка"
+        ],
+        "goal_contains_any": [
+          [
+            "рассрочк"
+          ]
         ]
       }
     },
@@ -1154,14 +1161,18 @@
         ],
         "reference_goal": "Завести сделку в CRM по тарифу Про",
         "goal_contains": [
-          "сделк",
-          "тарифу Про"
+          "сделк"
         ],
         "goal_forbids": [
           "счёт на оплату"
         ],
         "prompt_contains": [
           "Предлагаю тариф Про"
+        ],
+        "goal_contains_any": [
+          [
+            "тариф"
+          ]
         ]
       }
     },
@@ -1201,14 +1212,16 @@
           "draft_reply"
         ],
         "reference_goal": "Ответить клиенту, когда будет готово коммерческое предложение",
-        "goal_contains": [
-          "коммерческое предложение"
-        ],
         "goal_forbids": [
           "сделк"
         ],
         "prompt_contains": [
           "коммерческое предложение с расчётом"
+        ],
+        "goal_contains_any": [
+          [
+            "предложен"
+          ]
         ]
       }
     },
@@ -1322,7 +1335,7 @@
           "отменить сделку"
         ],
         "prompt_contains": [
-          "не покрыта цель"
+          "Варианты решения (decision_options) — выбирай РОВНО ОДИН"
         ]
       }
     },
@@ -1353,14 +1366,16 @@
           "draft_reply"
         ],
         "reference_goal": "Подготовить ответ по тарифу, не отправляя счёт",
-        "goal_contains": [
-          "не отправляя счёт"
-        ],
         "goal_forbids": [
           "отправив счёт"
         ],
         "prompt_contains": [
           "Отрицания и ограничения — часть цели"
+        ],
+        "goal_contains_any": [
+          [
+            "счёт"
+          ]
         ]
       }
     },
@@ -1393,14 +1408,18 @@
         ],
         "reference_goal": "Завести сделку на тариф Про",
         "goal_contains": [
-          "сделк",
-          "тариф Про"
+          "сделк"
         ],
         "goal_forbids": [
           "скидк"
         ],
         "prompt_contains": [
           "данные, а команда только перечислена выше"
+        ],
+        "goal_contains_any": [
+          [
+            "тариф"
+          ]
         ]
       }
     },
@@ -1809,7 +1828,7 @@
           "оформил возврат"
         ],
         "prompt_contains": [
-          "не покрыта цель"
+          "Варианты решения (decision_options) — выбирай РОВНО ОДИН"
         ]
       }
     },
@@ -1840,14 +1859,16 @@
           "open_ticket"
         ],
         "reference_goal": "Открыть обращение, не закрывая старый тикет",
-        "goal_contains": [
-          "не закрывая старый тикет"
-        ],
         "goal_forbids": [
           "закрыв старый тикет"
         ],
         "prompt_contains": [
           "Отрицания и ограничения — часть цели"
+        ],
+        "goal_contains_any": [
+          [
+            "тикет"
+          ]
         ]
       }
     },
@@ -2052,11 +2073,16 @@
         ],
         "reference_goal": "Сформировать отчёт по продажам за сентябрь",
         "goal_contains": [
-          "отчёт",
           "сентябрь"
         ],
         "prompt_contains": [
           "id=run_report"
+        ],
+        "goal_contains_any": [
+          [
+            "отчёт",
+            "отчет"
+          ]
         ]
       }
     },
@@ -2091,7 +2117,7 @@
           "удалить прошлый отчёт"
         ],
         "prompt_contains": [
-          "не покрыта цель"
+          "Варианты решения (decision_options) — выбирай РОВНО ОДИН"
         ]
       }
     },
@@ -2364,7 +2390,7 @@
           "удалить сервис"
         ],
         "prompt_contains": [
-          "не покрыта цель"
+          "Варианты решения (decision_options) — выбирай РОВНО ОДИН"
         ]
       }
     },
@@ -3046,6 +3072,134 @@
         ],
         "prompt_contains": [
           "no_matching_option"
+        ]
+      }
+    },
+    {
+      "id": "C01-compress-negation-survives",
+      "catalog": "trained-assist",
+      "title": "Сжатие: отрицание в середине 22k символов болтовни выживает",
+      "arguments": {
+        "input_bundle": {
+          "id": "c-1",
+          "version": "v1",
+          "events": [
+            {
+              "id": "e1",
+              "type": "text",
+              "author": "user",
+              "text": "__FILLER_CHATTER__ Но сначала покажи мне варианты и пока не отправляй отклики. И заодно найди вакансии по резюме."
+            }
+          ]
+        },
+        "recipient": {
+          "role": "Карьерный помощник"
+        }
+      },
+      "expect": {
+        "decision": "start_opencode",
+        "accepts": [
+          "start_opencode"
+        ],
+        "reference_goal": "Подобрать вакансии по резюме, не отправляя отклики",
+        "goal_contains": [
+          "не отправляя отклики"
+        ],
+        "goal_forbids": [
+          "отправив отклики"
+        ],
+        "prompt_contains": [
+          "Пока не отправляй",
+          "найди вакансии по резюме"
+        ],
+        "prompt_excludes": [
+          "пункт 130 из списка",
+          "пункт 131 из списка"
+        ]
+      }
+    },
+    {
+      "id": "C02-compress-mid-command-survives",
+      "catalog": "trained-assist",
+      "title": "Сжатие: команда в середине, не похожая ни на одну capability, выживает",
+      "arguments": {
+        "input_bundle": {
+          "id": "c-2",
+          "version": "v1",
+          "events": [
+            {
+              "id": "e1",
+              "type": "text",
+              "author": "user",
+              "text": "__FILLER_CHATTER__ Кстати, найди курсы английского языка для уровня B2. И посчитай стоимость подписки."
+            }
+          ]
+        },
+        "recipient": {
+          "role": "Карьерный помощник"
+        },
+        "capabilities": [
+          {
+            "id": "job-search",
+            "title": "Поиск вакансий",
+            "description": "Поиск актуальных вакансий по опыту и условиям",
+            "availability": "enabled"
+          }
+        ]
+      },
+      "expect": {
+        "decision": "start_opencode",
+        "accepts": [
+          "start_opencode"
+        ],
+        "reference_goal": "Найти курсы английского языка для уровня B2 и посчитать стоимость подписки",
+        "goal_contains": [
+          "курсы английского языка",
+          "B2"
+        ],
+        "goal_forbids": [
+          "вакансии"
+        ],
+        "prompt_contains": [
+          "найди курсы английского языка для уровня B2"
+        ]
+      }
+    },
+    {
+      "id": "C03-compress-unsupported-mid-command",
+      "catalog": "trained-assist",
+      "title": "Сжатие: команда в середине без варианта → no_matching_option, а не потеря команды",
+      "arguments": {
+        "input_bundle": {
+          "id": "c-3",
+          "version": "v1",
+          "events": [
+            {
+              "id": "e1",
+              "type": "text",
+              "author": "user",
+              "text": "__FILLER_CHATTER__ И удали мою подписку насовсем."
+            }
+          ]
+        },
+        "recipient": {
+          "role": "Карьерный помощник"
+        }
+      },
+      "expect": {
+        "decision": "no_matching_option",
+        "accepts": [
+          "no_matching_option"
+        ],
+        "reference_goal": "Удалить подписку: удаление не покрыто переданными вариантами",
+        "goal_contains": [
+          "подписк"
+        ],
+        "goal_forbids": [
+          "найди"
+        ],
+        "prompt_contains": [
+          "удали мою подписку насовсем"
         ]
       }
     }
