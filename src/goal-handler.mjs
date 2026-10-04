@@ -8,7 +8,7 @@ import { renderGoalPrompt } from './goal-prompt.mjs';
 import { TypedError, logEvent } from './typed-error.mjs';
 
 export const GOAL_CONTRACT_VERSION = 'v1';
-export const GOAL_PROMPT_VERSION = 'gp3';
+export const GOAL_PROMPT_VERSION = 'gp4';
 export const GOAL_LADDER_NAME = globalThis.process?.env?.LLM_LADDER_NAME || 'service:classify';
 export const GOAL_MAX_ATTEMPTS = 2;
 export const GOAL_MAX_INPUT_CHARS = 120000;

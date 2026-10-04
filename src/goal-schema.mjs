@@ -15,8 +15,8 @@ export function buildGoalDecisionSchema(materialBindings = null) {
         required: ['instruction'],
         properties: {
           instruction: { type: 'string', minLength: 8, description: 'Open-ended next action for the writer, derived from the conversation objective and current state.' },
-          required_points: { type: 'array', items: { type: 'string' } },
-          forbidden_points: { type: 'array', items: { type: 'string' } },
+          required_points: { type: 'array', description: 'Only confirmed factual information to mention, preferably short exact quotes from state evidence. No communicative directives, questions, prohibitions, unknown facts, or planned checks; use [] when unnecessary.', items: { type: 'string' } },
+          forbidden_points: { type: 'array', description: 'Prohibitions for the writer. Actions belong in instruction, confirmed facts in required_points.', items: { type: 'string' } },
         },
       },
       ...(materialBindings ? { execution: {
@@ -84,8 +84,8 @@ export function buildGoalResultSchema() {
         required: ['instruction', 'required_points', 'forbidden_points'],
         properties: {
           instruction: { type: 'string' },
-          required_points: { type: 'array', items: { type: 'string' } },
-          forbidden_points: { type: 'array', items: { type: 'string' } },
+          required_points: { type: 'array', description: 'Only confirmed factual information to mention, preferably short exact quotes from state evidence. No communicative directives, questions, prohibitions, unknown facts, or planned checks; use [] when unnecessary.', items: { type: 'string' } },
+          forbidden_points: { type: 'array', description: 'Prohibitions for the writer. Actions belong in instruction, confirmed facts in required_points.', items: { type: 'string' } },
         },
       },
       execution: {

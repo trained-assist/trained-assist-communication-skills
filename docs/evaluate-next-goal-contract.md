@@ -37,6 +37,8 @@ Optional `language` controls the language of the goal instruction. The total ser
 }
 ```
 
+`goal.instruction` contains communicative directives: what to ask, acknowledge, clarify, or do next. `required_points` contains only confirmed factual information to mention, preferably short exact quotes from state evidence; it is empty when no confirmed fact needs repeating. Unknown availability and a planned check belong in the instruction, not in required facts. Prohibitions belong in `forbidden_points`. The writer checks required facts against its supporting evidence and preserves `needs_context` when a fact is unavailable.
+
 `goal.instruction` is generated from the objective and state; it is not copied from a fixed goal catalog. `reason` may be omitted or empty. The `status` values are control outcomes, not goal choices:
 
 | Status | Writer behavior |
