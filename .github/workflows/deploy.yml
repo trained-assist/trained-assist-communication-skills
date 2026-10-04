@@ -10,9 +10,6 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-concurrency:
-  group: comm-deploy-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
 jobs:
   # ── staging: isolated worker per branch + health check ─────────────────────
   deploy-staging:
