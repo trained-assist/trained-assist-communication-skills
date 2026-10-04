@@ -6,7 +6,7 @@ on:
     branches: [main]
   workflow_dispatch:
 jobs:
-  deploy-staging:
+  diag:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -16,9 +16,4 @@ jobs:
           node-version: '22'
           cache: 'npm'
       - run: npm ci
-      - name: Deploy isolated staging
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: deploy --config wrangler.jsonc
+      - run: echo "diag ok"
