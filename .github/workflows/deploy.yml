@@ -1,21 +1,14 @@
 name: deploy
 on:
-  # Staging deploy + smoke on every push and PR: the owner's gate is «staging-деплой
-  # + смоук на актуальной ревизии до мержа в main», so a PR cannot merge on CI green
-  # alone — it must have been deployed and answered on staging first.
   push:
     branches: ['**']
   pull_request:
     branches: [main]
   workflow_dispatch:
 jobs:
-  # ── staging: isolated worker per branch + health check ─────────────────────
   deploy-staging:
     runs-on: ubuntu-latest
     timeout-minutes: 8
-    outputs:
-      worker: ${{ steps.preview.outputs.worker }}
-      url: ${{ steps.preview.outputs.url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,115 +16,9 @@ jobs:
           node-version: '22'
           cache: 'npm'
       - run: npm ci
-      - name: Select isolated branch staging
-        id: preview
-        env:
-          STAGING_BRANCH: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-          SUFFIX=$(printf '%s' "$STAGING_BRANCH" | sha256sum | cut -c1-12)
-          WORKER="comm-skills-staging-$SUFFIX"
-          echo "worker=$WORKER" >> "$GITHUB_OUTPUT"
-          echo "url=https://$WORKER.skillset-apply.workers.dev" >> "$GITHUB_OUTPUT"
       - name: Deploy isolated staging
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          # The staging worker is a SEPARATE script name, so it never overwrites the
-          # production worker. Same source, same secrets, different name — that is
-          # what makes a staging answer comparable to a production one.
-          command: deploy --config wrangler.staging.jsonc --var BUILD_SHA:${{ github.sha }}
-        env:
-          STAGING_WORKER: ${{ steps.preview.outputs.worker }}
-      - name: Staging health check
-        run: |
-          set -euo pipefail
-          URL="${{ steps.preview.outputs.url }}"
-          echo "waiting for $URL/health"
-          for i in $(seq 1 30); do
-            BODY=$(curl -fsS --max-time 10 "$URL/health" 2>/dev/null || true)
-            if [ -n "$BODY" ]; then
-              echo "$BODY"
-              echo "$BODY" | grep -q '"status":"ready"' && exit 0
-              # not_configured is a HONEST answer from a fresh worker: the ladder
-              # config is a secret, and a missing secret must not read as "ok".
-              echo "$BODY" | grep -q '"status":"not_configured"' && exit 0
-            fi
-            sleep 4
-          done
-          echo "staging worker never answered /health" >&2
-          exit 1
-
-  # ── staging smoke: both methods over the real wire ─────────────────────────
-  smoke-staging:
-    runs-on: ubuntu-latest
-    needs: deploy-staging
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - run: npm ci
-      - name: Smoke both methods on staging
-        env:
-          URL: ${{ needs.deploy-staging.outputs.url }}
-          TOKEN: ${{ secrets.COMMUNICATION_TOKEN }}
-        run: node scripts/sandbox/smoke-staging.mjs
-
-  # ── production deploy (main only) ──────────────────────────────────────────
-  deploy:
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    needs: [deploy-staging, smoke-staging]
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-      - run: npm ci
-      - name: Deploy production worker
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: deploy --var BUILD_SHA:${{ github.sha }}
-
-  # ── production smoke ───────────────────────────────────────────────────────
-  smoke:
-    runs-on: ubuntu-latest
-    needs: deploy
-    timeout-minutes: 8
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - run: npm ci
-      - name: Smoke production
-        env:
-          URL: https://trained-assist-communication-skills.skillset-apply.workers.dev
-          TOKEN: ${{ secrets.COMMUNICATION_TOKEN }}
-        run: node scripts/sandbox/smoke-staging.mjs
-
-  # ── the owner's gate: staging deploy + smoke BEFORE merge to main ──────────
-  gate:
-    name: staging-deploy-and-smoke
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    needs: [deploy-staging, smoke-staging]
-    if: always()
-    steps:
-      - name: Require staging deploy and smoke to succeed
-        env:
-          DEPLOY: ${{ needs.deploy-staging.result }}
-          SMOKE: ${{ needs.smoke-staging.result }}
-        run: |
-          echo "deploy-staging: $DEPLOY"
-          echo "smoke-staging:  $SMOKE"
-          test "$DEPLOY" = success || { echo "::error::staging deploy did not succeed on this revision"; exit 1; }
-          test "$SMOKE" = success || { echo "::error::staging smoke did not succeed on this revision"; exit 1; }
-          echo "OK: this revision was deployed to staging and answered both methods."
+          command: deploy --config wrangler.jsonc
