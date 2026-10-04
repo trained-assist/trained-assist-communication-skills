@@ -8,14 +8,6 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
-permissions:
-  contents: read
-concurrency:
-  # Только github.ref, БЕЗ github.head_ref: для pull_request события head_ref пуст,
-  # и GitHub падал с startup_failure ещё до создания джобов — диагностировано
-  # тремя прогонами (минимальный воркфлоу без concurrency проходил).
-  group: comm-deploy-${{ github.ref }}
-  cancel-in-progress: true
 jobs:
   # ── staging: isolated worker per branch + health check ─────────────────────
   deploy-staging:
