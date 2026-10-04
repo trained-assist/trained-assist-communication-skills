@@ -71,8 +71,30 @@ export async function startFakeLadder({ scenarios = [] } = {}) {
     }
 
     // Case-insensitive: the writer may capitalise the goal instruction it was handed.
-    const rendered = (body.messages || []).map((m) => String(m.content || '')).join('\n').toLowerCase();
-    const scenario = scenarios.find((s) => rendered.includes(String(s.match).toLowerCase()));
+    //
+    // Three rules, each learned from a red sandbox:
+    //  1. Match on the CALLER'S OWN messages only. The system prompt is the method's
+    //     own instructions — it legitimately quotes example phrases («ты умеешь
+    //     искать вакансии?»), and a fixture that matches such a phrase fires on every
+    //     single request, turning a whole scenario block red for the wrong reason.
+    //  2. A match that IS a bundle id is an exact key, not a substring: two scenarios
+    //     may legitimately share the same user text and differ only in the catalog or
+    //     the priority, and then the bundle id is the only honest discriminator.
+    //  3. Otherwise the LONGEST match wins. «Сколько сделок в работе?» is a prefix of
+    //     «…и открой обращение», and first-in-array order made the longer, more
+    //     specific scripts unreachable.
+    const callerText = (body.messages || [])
+      .filter((m) => m && m.role === 'user')
+      .map((m) => String(m.content || ''))
+      .join('\n')
+      .toLowerCase();
+    const bundleKey = scenarios.find((s) => (
+      /^b-[a-z0-9-]+$/i.test(String(s.match))
+      && callerText.includes(`bundle: ${String(s.match).toLowerCase()} @`)
+    ));
+    const scenario = bundleKey || scenarios
+      .filter((s) => callerText.includes(String(s.match).toLowerCase()))
+      .sort((a, b) => String(b.match).length - String(a.match).length)[0];
     const key = scenario ? scenario.match : '(default)';
     const n = (perScenarioCount.get(key) || 0) + 1;
     perScenarioCount.set(key, n);
@@ -84,6 +106,9 @@ export async function startFakeLadder({ scenarios = [] } = {}) {
       rung: body.ladder_rung ?? null,
       temperature: body.temperature ?? null,
       max_tokens: body.max_tokens ?? null,
+      // Recorded so a scenario can assert that the schema ACTUALLY went out. Without
+      // it, dropping response_format would be invisible: the fake answers either way.
+      response_format: body.response_format ?? null,
       app: req.headers['x-ladder-app'] ?? null,
       auth: /^Bearer\s+\S/.test(String(req.headers.authorization || '')) ? 'bearer' : 'MISSING',
       messages: body.messages || [],

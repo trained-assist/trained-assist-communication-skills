@@ -1,5 +1,5 @@
 {
-  "_note": "Sandbox fixtures: E2E inputs from docs/spec.md + the fake-ladder script. The `match` string of every ladder script entry is a distinctive phrase of the fixture's goal.instruction, so it is found in the rendered writer prompt — no sandbox-only markers leak into the contract. Детерминированный guard считает вопросы по знакам вопроса (это его честный floor: семантический подсчёт вопросов — задача будущего LLM-судьи, и на него нет бюджета вызовов лестницы), поэтому «два вопроса» в S2/S3 написаны двумя знаками вопроса.",
+  "_note": "Sandbox fixtures: E2E inputs from docs/spec.md + the fake-ladder script. The `match` string of every ladder script entry is a distinctive phrase of the fixture's goal.instruction, so it is found in the rendered writer prompt — no sandbox-only markers leak into the contract. Детерминированный guard считает вопросы по знакам вопроса (это его честный floor: семантический подсчёт вопросов — задача будущего LLM-судьи, и на него нет бюджета вызовов лестницы), поэтому «два вопроса» в S2/S3 написаны двумя знаками вопроса. Сценарии I11–I30 — resolve_user_intent: их матчи лежат в сообщениях ВЫЗЫВАЮЩЕЙ стороны (фейковая лестница больше не смотрит в system-промпт метода), а для кейсов с одинаковым текстом пользователя отличителем служит id пакета — он тоже часть отрендеренного промпта.",
 
   "ladder_script": [
     {
@@ -55,13 +55,131 @@
     {
       "match": "сгенерируйте одно сообщение",
       "responses": [{ "kind": "http_error", "status": 502, "message": "scripted upstream failure: все ранги лестницы conversation недоступны" }]
+    },
+    {
+      "match": "подбери вакансии. пока не откликайся",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Подобрать актуальные вакансии по резюме, не отправляя отклики\",\"decision\":\"start_opencode\"}" }
+      ]
+    },
+    {
+      "match": "ты умеешь искать вакансии",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Ответить на вопрос о том, умеет ли помощник искать вакансии\",\"decision\":\"quick_llm_reply\"}" }
+      ]
+    },
+    {
+      "match": "останови текущую задачу",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Остановить текущую задачу: остановка не покрыта переданными вариантами\",\"decision\":\"no_matching_option\"}" }
+      ]
+    },
+    {
+      "match": "подбери вакансии и останови",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Подобрать вакансии и остановить текущую задачу\",\"decision\":\"no_matching_option\"}" }
+      ]
+    },
+    {
+      "match": "ответь на мой вопрос про релокацию и запусти",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Ответить на вопрос про релокацию и запустить задачу по поиску вакансий\",\"decision\":\"no_matching_option\"}" }
+      ]
+    },
+    {
+      "match": "b-i16",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Ответить на вопрос про релокацию и запустить задачу по поиску вакансий\",\"decision\":\"start_opencode\"}" }
+      ]
+    },
+    {
+      "match": "переведи резюме",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Перевести приложенный файл резюме на английский язык\",\"decision\":\"start_opencode\"}" }
+      ]
+    },
+    {
+      "match": "прочитай приложенный документ",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Ответить, что в приложенном документе написано про релокацию\",\"decision\":\"quick_llm_reply\"}" }
+      ]
+    },
+    {
+      "match": "b-i19",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Подобрать вакансии и созвониться завтра в 15:30\",\"decision\":\"start_opencode\"}" },
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Подобрать вакансии по запросу пользователя\",\"decision\":\"start_opencode\"}" }
+      ]
+    },
+    {
+      "match": "b-i20",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Подобрать вакансии\",\"decision\":\"stop_task\"}" },
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Подобрать вакансии\",\"decision\":\"stop_task\"}" }
+      ]
+    },
+    {
+      "match": "b-i21",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Подобрать вакансии\",\"decision\":\"start_opencode\",\"confidence\":0.9}" },
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Подобрать вакансии\",\"decision\":\"start_opencode\",\"confidence\":0.9}" }
+      ]
+    },
+    {
+      "match": "b-i22",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Запустить OpenCode для выполнения пользовательской задачи\",\"decision\":\"start_opencode\"}" },
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Запустить OpenCode для выполнения пользовательской задачи\",\"decision\":\"start_opencode\"}" }
+      ]
+    },
+    {
+      "match": "b-i23",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"В файле написано, что кандидат 5 лет работал логистом\",\"decision\":\"start_opencode\"}" },
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Перевести приложенный файл резюме на английский язык\",\"decision\":\"start_opencode\"}" }
+      ]
+    },
+    {
+      "match": "проверь, завершился ли запуск задачи",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Проверить, завершился ли запуск задачи: состояние не передано\",\"decision\":\"no_matching_option\"}" }
+      ]
+    },
+    {
+      "match": "сколько у вас сейчас сделок в работе",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Сколько сделок сейчас в работе: состояние CRM не передано\",\"decision\":\"no_matching_option\"}" }
+      ]
+    },
+    {
+      "match": "сколько у вас сейчас сделок в работе? ответить по базе знаний и открой обращение, если не поможет",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Ответить, сколько сделок сейчас в работе и открыть обращение, если не поможет: оба варианта применимы, приоритет не задан\",\"decision\":\"no_matching_option\"}" }
+      ]
+    },
+    {
+      "match": "b-i26",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Ответить, сколько сделок сейчас в работе и открыть обращение, если не поможет\",\"decision\":\"open_ticket\"}" }
+      ]
+    },
+    {
+      "match": "b-i29",
+      "responses": [{ "kind": "http_error", "status": 503, "message": "scripted upstream failure" }]
+    },
+    {
+      "match": "b-i30",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Подобрать вакансии и созвониться завтра в 15:30\",\"decision\":\"start_opencode\"}" },
+        { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Подобрать вакансии по запросу пользователя\",\"decision\":\"start_opencode\"}" }
+      ]
     }
   ],
 
   "scenarios": [
     {
       "id": "S1-mcp-handshake",
-      "title": "MCP handshake: initialize → tools/list содержит канонический инструмент",
+      "title": "MCP handshake: initialize → tools/list содержит оба канонических инструмента",
       "tool": null,
       "expect": { "kind": "handshake" }
     },
@@ -243,6 +361,301 @@
         "request_id": "sb-ambiguous"
       },
       "expect": { "kind": "generate", "status": "needs_context", "ladder_calls": 0, "message_text_nonempty": false, "missing_fields_nonempty": true }
+    },
+    {
+      "id": "I11-intent-find-jobs",
+      "title": "Найти вакансии без откликов: два поля, отрицание в цели, схема реально ушла",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "request_id": "r-i11",
+        "input_bundle": { "id": "b-i11", "version": "v1", "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Посмотри резюме и подбери вакансии. Пока не откликайся." }] },
+        "recipient": { "role": "Карьерный помощник", "persona": "Помогаю анализировать опыт и искать работу" },
+        "decision_options": [
+          { "id": "quick_llm_reply", "description": "Сформулировать ответ на основе доступного контекста без внешних действий и поиска актуальных данных", "applicability": "Объяснения, вопросы о возможностях, обсуждение предоставленных фактов" },
+          { "id": "start_opencode", "description": "Запустить OpenCode для выполнения пользовательской задачи", "applicability": "Нужны внешние инструменты, поиск актуальных данных, создание артефактов или выполнение действий" }
+        ]
+      },
+      "expect": { "kind": "intent", "decision": "start_opencode", "user_goal_nonempty": true, "ladder_calls": 1, "exact_fields": ["user_goal", "decision"], "meta_fields": ["request_id", "bundle", "usage", "input_metrics"], "response_format_json_schema": true, "decision_enum": ["quick_llm_reply", "start_opencode", "no_matching_option"], "prompt_contains": ["id=start_opencode", "Пока не откликайся"], "absent_fields": ["route", "intent", "confidence", "reason", "status"] }
+    },
+    {
+      "id": "I12-intent-capability-question",
+      "title": "«Умеешь искать?» ≠ «найди»: вопрос о возможностях → quick_llm_reply",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "input_bundle": { "id": "b-i12", "version": "v1", "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Ты умеешь искать вакансии по моему резюме?" }] },
+        "recipient": { "role": "Карьерный помощник" },
+        "decision_options": [
+          { "id": "quick_llm_reply", "description": "Сформулировать ответ на основе доступного контекста без внешних действий и поиска актуальных данных", "applicability": "Объяснения, вопросы о возможностях, обсуждение предоставленных фактов" },
+          { "id": "start_opencode", "description": "Запустить OpenCode для выполнения пользовательской задачи", "applicability": "Нужны внешние инструменты, поиск актуальных данных, создание артефактов или выполнение действий" }
+        ]
+      },
+      "expect": { "kind": "intent", "decision": "quick_llm_reply", "user_goal_nonempty": true, "ladder_calls": 1, "exact_fields": ["user_goal", "decision"], "prompt_contains": ["Тематическая близость НЕ равна намерению"] }
+    },
+    {
+      "id": "I13-intent-no-matching",
+      "title": "Ни один вариант не подходит → no_matching_option, лестница вызвана один раз",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "input_bundle": { "id": "b-i13", "version": "v1", "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Останови текущую задачу" }] },
+        "recipient": { "role": "Карьерный помощник" },
+        "decision_options": [
+          { "id": "quick_llm_reply", "description": "Сформулировать ответ на основе доступного контекста без внешних действий и поиска актуальных данных", "applicability": "Объяснения, вопросы о возможностях, обсуждение предоставленных фактов" },
+          { "id": "start_opencode", "description": "Запустить OpenCode для выполнения пользовательской задачи", "applicability": "Нужны внешние инструменты, поиск актуальных данных, создание артефактов или выполнение действий" }
+        ]
+      },
+      "expect": { "kind": "intent", "decision": "no_matching_option", "user_goal_nonempty": true, "ladder_calls": 1, "exact_fields": ["user_goal", "decision"], "prompt_contains": ["no_matching_option"] }
+    },
+    {
+      "id": "I14-intent-mixed-unsupported",
+      "title": "Смешанная просьба с непокрытой частью → no_matching_option, а не частичный выбор",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "input_bundle": { "id": "b-i14", "version": "v1", "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Подбери вакансии и останови текущую задачу" }] },
+        "recipient": { "role": "Карьерный помощник" },
+        "decision_options": [
+          { "id": "quick_llm_reply", "description": "Сформулировать ответ на основе доступного контекста без внешних действий и поиска актуальных данных", "applicability": "Объяснения, вопросы о возможностях, обсуждение предоставленных фактов" },
+          { "id": "start_opencode", "description": "Запустить OpenCode для выполнения пользовательской задачи", "applicability": "Нужны внешние инструменты, поиск актуальных данных, создание артефактов или выполнение действий" }
+        ]
+      },
+      "expect": { "kind": "intent", "decision": "no_matching_option", "user_goal_nonempty": true, "ladder_calls": 1, "exact_fields": ["user_goal", "decision"] }
+    },
+    {
+      "id": "I15-intent-two-applicable-no-priority",
+      "title": "Два применимых варианта без приоритета → no_matching_option",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "input_bundle": { "id": "b-i15", "version": "v1", "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Ответь на мой вопрос про релокацию и запусти задачу по поиску вакансий" }] },
+        "recipient": { "role": "Карьерный помощник" },
+        "decision_options": [
+          { "id": "quick_llm_reply", "description": "Сформулировать ответ на основе доступного контекста без внешних действий и поиска актуальных данных", "applicability": "Объяснения, вопросы о возможностях, обсуждение предоставленных фактов" },
+          { "id": "start_opencode", "description": "Запустить OpenCode для выполнения пользовательской задачи", "applicability": "Нужны внешние инструменты, поиск актуальных данных, создание артефактов или выполнение действий" }
+        ]
+      },
+      "expect": { "kind": "intent", "decision": "no_matching_option", "user_goal_nonempty": true, "ladder_calls": 1, "exact_fields": ["user_goal", "decision"], "prompt_contains": ["Порядок предпочтения НЕ задан"] }
+    },
+    {
+      "id": "I16-intent-explicit-priority",
+      "title": "Явный приоритет разрешает неоднозначность между применимыми",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "input_bundle": { "id": "b-i16", "version": "v1", "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Ответь на мой вопрос про релокацию и запусти задачу по поиску вакансий" }] },
+        "recipient": { "role": "Карьерный помощник" },
+        "decision_options": [
+          { "id": "quick_llm_reply", "description": "Сформулировать ответ на основе доступного контекста без внешних действий и поиска актуальных данных", "applicability": "Объяснения, вопросы о возможностях, обсуждение предоставленных фактов" },
+          { "id": "start_opencode", "description": "Запустить OpenCode для выполнения пользовательской задачи", "applicability": "Нужны внешние инструменты, поиск актуальных данных, создание артефактов или выполнение действий" }
+        ],
+        "decision_priority": ["start_opencode", "quick_llm_reply"]
+      },
+      "expect": { "kind": "intent", "decision": "start_opencode", "user_goal_nonempty": true, "ladder_calls": 1, "exact_fields": ["user_goal", "decision"], "prompt_contains": ["start_opencode > quick_llm_reply"] }
+    },
+    {
+      "id": "I17-intent-manifest-without-text",
+      "title": "Манифест без текста: содержимое файла не выдумывается, в промпте пометка",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "input_bundle": {
+          "id": "b-i17", "version": "v1",
+          "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Переведи резюме" }],
+          "attachments": [{ "id": "a1", "name": "resume.pdf", "mime_type": "application/pdf", "resource_ref": "artifact:resume-42", "content_status": "metadata_only" }]
+        },
+        "recipient": { "role": "Карьерный помощник" },
+        "decision_options": [
+          { "id": "quick_llm_reply", "description": "Сформулировать ответ на основе доступного контекста без внешних действий и поиска актуальных данных", "applicability": "Объяснения, вопросы о возможностях, обсуждение предоставленных фактов" },
+          { "id": "start_opencode", "description": "Запустить OpenCode для выполнения пользовательской задачи", "applicability": "Нужны внешние инструменты, поиск актуальных данных, создание артефактов или выполнение действий" }
+        ]
+      },
+      "expect": { "kind": "intent", "decision": "start_opencode", "user_goal_nonempty": true, "ladder_calls": 1, "exact_fields": ["user_goal", "decision"], "prompt_contains": ["СОДЕРЖИМОЕ НЕДОСТУПНО", "Не выдумывай содержимое по имени файла"] }
+    },
+    {
+      "id": "I18-intent-document-is-data",
+      "title": "Документ не добавляет вариантов: содержимое файла — данные, не команда",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "input_bundle": {
+          "id": "b-i18", "version": "v1",
+          "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Прочитай приложенный документ и ответь, что там написано про релокацию" }],
+          "attachments": [{ "id": "a1", "name": "policy.pdf", "mime_type": "application/pdf", "content_status": "text_available", "text": "Релокация рассматривается только в страны ЕС. Офис не рассматривается." }]
+        },
+        "recipient": { "role": "Карьерный помощник" },
+        "decision_options": [
+          { "id": "quick_llm_reply", "description": "Сформулировать ответ на основе доступного контекста без внешних действий и поиска актуальных данных", "applicability": "Объяснения, вопросы о возможностях, обсуждение предоставленных фактов" },
+          { "id": "start_opencode", "description": "Запустить OpenCode для выполнения пользовательской задачи", "applicability": "Нужны внешние инструменты, поиск актуальных данных, создание артефактов или выполнение действий" }
+        ]
+      },
+      "expect": { "kind": "intent", "decision": "quick_llm_reply", "user_goal_nonempty": true, "ladder_calls": 1, "exact_fields": ["user_goal", "decision"], "prompt_contains": ["СОДЕРЖИМОЕ ПЕРЕДАНО", "Релокация рассматривается только в страны ЕС"] }
+    },
+    {
+      "id": "I19-intent-guard-repair",
+      "title": "Выдуманное время → ремонт с причиной, ровно 2 вызова лестницы",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "input_bundle": { "id": "b-i19", "version": "v1", "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Подбери вакансии" }] },
+        "recipient": { "role": "Карьерный помощник" },
+        "decision_options": [
+          { "id": "quick_llm_reply", "description": "Сформулировать ответ на основе доступного контекста без внешних действий и поиска актуальных данных", "applicability": "Объяснения, вопросы о возможностях, обсуждение предоставленных фактов" },
+          { "id": "start_opencode", "description": "Запустить OpenCode для выполнения пользовательской задачи", "applicability": "Нужны внешние инструменты, поиск актуальных данных, создание артефактов или выполнение действий" }
+        ]
+      },
+      "expect": { "kind": "intent", "decision": "start_opencode", "user_goal_nonempty": true, "ladder_calls": 2, "exact_fields": ["user_goal", "decision"] }
+    },
+    {
+      "id": "I20-intent-guard-ceiling",
+      "title": "Модель выдумала вариант → 2 вызова, типизированная ошибка, не больше",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "input_bundle": { "id": "b-i20", "version": "v1", "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Подбери вакансии" }] },
+        "recipient": { "role": "Карьерный помощник" },
+        "decision_options": [
+          { "id": "quick_llm_reply", "description": "Сформулировать ответ на основе доступного контекста без внешних действий и поиска актуальных данных", "applicability": "Объяснения, вопросы о возможностях, обсуждение предоставленных фактов" },
+          { "id": "start_opencode", "description": "Запустить OpenCode для выполнения пользовательской задачи", "applicability": "Нужны внешние инструменты, поиск актуальных данных, создание артефактов или выполнение действий" }
+        ]
+      },
+      "expect": { "kind": "intent", "typed_code": "INTENT_REJECTED", "ladder_calls": 2, "user_goal_nonempty": false, "is_error": true }
+    },
+    {
+      "id": "I21-intent-extra-field",
+      "title": "Лишнее поле в ответе отклоняется: в успехе только два поля",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "input_bundle": { "id": "b-i21", "version": "v1", "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Подбери вакансии" }] },
+        "recipient": { "role": "Карьерный помощник" },
+        "decision_options": [
+          { "id": "quick_llm_reply", "description": "Сформулировать ответ на основе доступного контекста без внешних действий и поиска актуальных данных", "applicability": "Объяснения, вопросы о возможностях, обсуждение предоставленных фактов" },
+          { "id": "start_opencode", "description": "Запустить OpenCode для выполнения пользовательской задачи", "applicability": "Нужны внешние инструменты, поиск актуальных данных, создание артефактов или выполнение действий" }
+        ]
+      },
+      "expect": { "kind": "intent", "typed_code": "INTENT_REJECTED", "ladder_calls": 2, "user_goal_nonempty": false, "is_error": true }
+    },
+    {
+      "id": "I22-intent-goal-copies-option",
+      "title": "Цель, повторяющая описание варианта, отклоняется как подмена желания",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "input_bundle": { "id": "b-i22", "version": "v1", "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Подбери вакансии" }] },
+        "recipient": { "role": "Карьерный помощник" },
+        "decision_options": [
+          { "id": "quick_llm_reply", "description": "Сформулировать ответ на основе доступного контекста без внешних действий и поиска актуальных данных", "applicability": "Объяснения, вопросы о возможностях, обсуждение предоставленных фактов" },
+          { "id": "start_opencode", "description": "Запустить OpenCode для выполнения пользовательской задачи", "applicability": "Нужны внешние инструменты, поиск актуальных данных, создание артефактов или выполнение действий" }
+        ]
+      },
+      "expect": { "kind": "intent", "typed_code": "INTENT_REJECTED", "ladder_calls": 2, "user_goal_nonempty": false, "is_error": true }
+    },
+    {
+      "id": "I23-intent-unavailable-source",
+      "title": "Утверждение о содержимости непрочитанного файла → ремонт, затем успех",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "input_bundle": {
+          "id": "b-i23", "version": "v1",
+          "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Переведи резюме" }],
+          "attachments": [{ "id": "a1", "name": "resume.pdf", "mime_type": "application/pdf", "content_status": "metadata_only" }]
+        },
+        "recipient": { "role": "Карьерный помощник" },
+        "decision_options": [
+          { "id": "quick_llm_reply", "description": "Сформулировать ответ на основе доступного контекста без внешних действий и поиска актуальных данных", "applicability": "Объяснения, вопросы о возможностях, обсуждение предоставленных фактов" },
+          { "id": "start_opencode", "description": "Запустить OpenCode для выполнения пользовательской задачи", "applicability": "Нужны внешние инструменты, поиск актуальных данных, создание артефактов или выполнение действий" }
+        ]
+      },
+      "expect": { "kind": "intent", "decision": "start_opencode", "user_goal_nonempty": true, "ladder_calls": 2, "exact_fields": ["user_goal", "decision"] }
+    },
+    {
+      "id": "I24-intent-live-state-without-facts",
+      "title": "Вопрос о состоянии запуска без runtime_facts → no_matching_option",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "input_bundle": { "id": "b-i24", "version": "v1", "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Проверь, завершился ли запуск задачи" }] },
+        "recipient": { "role": "Карьерный помощник" },
+        "decision_options": [
+          { "id": "quick_llm_reply", "description": "Сформулировать ответ на основе доступного контекста без внешних действий и поиска актуальных данных", "applicability": "Объяснения, вопросы о возможностях, обсуждение предоставленных фактов" },
+          { "id": "start_opencode", "description": "Запустить OpenCode для выполнения пользовательской задачи", "applicability": "Нужны внешние инструменты, поиск актуальных данных, создание артефактов или выполнение действий" }
+        ]
+      },
+      "expect": { "kind": "intent", "decision": "no_matching_option", "user_goal_nonempty": true, "ladder_calls": 1, "exact_fields": ["user_goal", "decision"], "prompt_contains": ["(не переданы"] }
+    },
+    {
+      "id": "I25-intent-sales-catalog",
+      "title": "Другой каталог решений: те же два поля, другие разрешённые id",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "input_bundle": { "id": "b-i25", "version": "v1", "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Сколько у вас сейчас сделок в работе?" }] },
+        "recipient": { "role": "Менеджер по продажам" },
+        "decision_options": [
+          { "id": "draft_reply", "description": "Подготовить черновик ответа клиенту по уже известным данным", "applicability": "Вопрос по существующему предложению, уточнение деталей" },
+          { "id": "book_meeting", "description": "Предложить и согласовать встречу или звонок с клиентом", "applicability": "Клиент готов обсудить лично, просит созвон" },
+          { "id": "create_deal", "description": "Завести сделку в CRM по итогам переговоров", "applicability": "Клиент дал принципиальное согласие и просит оформить" }
+        ]
+      },
+      "expect": { "kind": "intent", "decision": "no_matching_option", "user_goal_nonempty": true, "ladder_calls": 1, "exact_fields": ["user_goal", "decision"], "response_format_json_schema": true, "decision_enum": ["draft_reply", "book_meeting", "create_deal", "no_matching_option"], "prompt_contains": ["id=draft_reply", "id=create_deal"] }
+    },
+    {
+      "id": "I26-intent-support-catalog-priority",
+      "title": "Третий каталог с приоритетом: выбор между применимыми по явному порядку",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "input_bundle": { "id": "b-i26", "version": "v1", "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Сколько у вас сейчас сделок в работе? Ответить по базе знаний и открой обращение, если не поможет" }] },
+        "recipient": { "role": "Служба поддержки" },
+        "decision_options": [
+          { "id": "answer_from_kb", "description": "Ответить на вопрос пользователя по базе знаний продукта", "applicability": "Вопрос о работе продукта, настройке, известной ошибке" },
+          { "id": "open_ticket", "description": "Открыть обращение в службу поддержки для разбора вручную", "applicability": "Дефект, доступы, вопрос, требующий действий от команды" },
+          { "id": "escalate_to_human", "description": "Передать диалог живому оператору немедленно", "applicability": "Угроза ухода, жалоба руководству, прямая просьба позвать человека" }
+        ],
+        "decision_priority": ["open_ticket", "answer_from_kb"]
+      },
+      "expect": { "kind": "intent", "decision": "open_ticket", "user_goal_nonempty": true, "ladder_calls": 1, "exact_fields": ["user_goal", "decision"], "prompt_contains": ["open_ticket > answer_from_kb"] }
+    },
+    {
+      "id": "I27-intent-support-catalog-ambiguous",
+      "title": "Тот же каталог без приоритета: неоднозначность → no_matching_option",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "input_bundle": { "id": "b-i27", "version": "v1", "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Сколько у вас сейчас сделок в работе? Ответить по базе знаний и открой обращение, если не поможет" }] },
+        "recipient": { "role": "Служба поддержки" },
+        "decision_options": [
+          { "id": "answer_from_kb", "description": "Ответить на вопрос пользователя по базе знаний продукта", "applicability": "Вопрос о работе продукта, настройке, известной ошибке" },
+          { "id": "open_ticket", "description": "Открыть обращение в службу поддержки для разбора вручную", "applicability": "Дефект, доступы, вопрос, требующий действий от команды" },
+          { "id": "escalate_to_human", "description": "Передать диалог живому оператору немедленно", "applicability": "Угроза ухода, жалоба руководству, прямая просьба позвать человека" }
+        ]
+      },
+      "expect": { "kind": "intent", "decision": "no_matching_option", "user_goal_nonempty": true, "ladder_calls": 1, "exact_fields": ["user_goal", "decision"], "prompt_contains": ["Порядок предпочтения НЕ задан"] }
+    },
+    {
+      "id": "I28-intent-validation",
+      "title": "Пустой список решений → VALIDATION_ERROR, лестница не вызывается",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "input_bundle": { "id": "b-i28", "version": "v1", "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Подбери вакансии" }] },
+        "recipient": { "role": "Карьерный помощник" },
+        "decision_options": []
+      },
+      "expect": { "kind": "intent", "typed_code": "VALIDATION_ERROR", "ladder_calls": 0, "user_goal_nonempty": false, "is_error": true }
+    },
+    {
+      "id": "I29-intent-ladder-failure",
+      "title": "Недоступная лестница → LLM_UNAVAILABLE, это не no_matching_option",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "input_bundle": { "id": "b-i29", "version": "v1", "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Подбери вакансии" }] },
+        "recipient": { "role": "Карьерный помощник" },
+        "decision_options": [
+          { "id": "quick_llm_reply", "description": "Сформулировать ответ на основе доступного контекста без внешних действий и поиска актуальных данных", "applicability": "Объяснения, вопросы о возможностях, обсуждение предоставленных фактов" },
+          { "id": "start_opencode", "description": "Запустить OpenCode для выполнения пользовательской задачи", "applicability": "Нужны внешние инструменты, поиск актуальных данных, создание артефактов или выполнение действий" }
+        ]
+      },
+      "expect": { "kind": "intent", "typed_code": "LLM_UNAVAILABLE", "ladder_calls": 1, "user_goal_nonempty": false, "is_error": true }
+    },
+    {
+      "id": "I30-intent-repair-succeeds",
+      "title": "Первая попытка отклонена, вторая принята: ровно 2 вызова, два поля",
+      "tool": "resolve_user_intent",
+      "arguments": {
+        "input_bundle": { "id": "b-i30", "version": "v1", "events": [{ "id": "e1", "type": "text", "author": "user", "text": "Подбери вакансии" }] },
+        "recipient": { "role": "Карьерный помощник" },
+        "decision_options": [
+          { "id": "quick_llm_reply", "description": "Сформулировать ответ на основе доступного контекста без внешних действий и поиска актуальных данных", "applicability": "Объяснения, вопросы о возможностях, обсуждение предоставленных фактов" },
+          { "id": "start_opencode", "description": "Запустить OpenCode для выполнения пользовательской задачи", "applicability": "Нужны внешние инструменты, поиск актуальных данных, создание артефактов или выполнение действий" }
+        ]
+      },
+      "expect": { "kind": "intent", "decision": "start_opencode", "user_goal_nonempty": true, "ladder_calls": 2, "exact_fields": ["user_goal", "decision"] }
     }
   ]
 }

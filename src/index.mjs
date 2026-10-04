@@ -18,7 +18,9 @@
 // which is what a stateless worker-hosted MCP server is actually used for.
 
 import { generateNextMessage, CONTRACT_VERSION, PROMPT_VERSION, MAX_ATTEMPTS } from './handler.mjs';
+import { resolveUserIntent, INTENT_CONTRACT_VERSION, INTENT_PROMPT_VERSION } from './intent-handler.mjs';
 import { TOOLS, SERVER_NAME, SERVER_VERSION, PROTOCOL_VERSION, handleMcpMessage } from './mcp/protocol.mjs';
+import { toolDeps } from './mcp/registry.mjs';
 
 function json(status, body, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
@@ -86,7 +88,7 @@ export default {
 
     if (url.pathname === '/health') return serveHealth(env);
     if (url.pathname === '/') {
-      return json(200, { service: SERVER_NAME, contract_version: CONTRACT_VERSION, endpoints: ['/health', '/mcp', '/v1/dialogs/next-message'] });
+      return json(200, { service: SERVER_NAME, contract_version: CONTRACT_VERSION, endpoints: ['/health', '/mcp', '/v1/dialogs/next-message', '/v1/intents/resolve'] });
     }
 
     const auth = authorized(request, env);
@@ -105,6 +107,26 @@ export default {
       return json(httpStatus, out.data, { 'x-contract-version': CONTRACT_VERSION });
     }
 
+    // ── REST door: resolve_user_intent (issue #10 §1) ─────────────────────────
+    if (url.pathname === '/v1/intents/resolve') {
+      if (request.method !== 'POST') return json(405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'используй POST' } });
+      const body = await readJson(request);
+      if (!body.ok) return json(400, { error: { code: 'INVALID_INPUT', message: body.message, retryable: false } });
+      const out = await resolveUserIntent(body.value, env);
+      if (out.isError) {
+        return json(statusForCode(out.data?.error?.code), out.data, { 'x-contract-version': INTENT_CONTRACT_VERSION });
+      }
+      // The body is the two-field answer and nothing else. Diagnostics travel in
+      // transport context (issue #10 §2): a REST caller compares the bundle version
+      // it sent against the one echoed here, which is what makes a stale result
+      // detectable instead of silently applied.
+      return json(200, out.data, {
+        'x-contract-version': INTENT_CONTRACT_VERSION,
+        'x-communication-request-id': out.meta?.request_id ?? null,
+        'x-communication-diagnostics': JSON.stringify(out.meta ?? {}),
+      });
+    }
+
     // ── MCP door ───────────────────────────────────────────────────────────
     if (url.pathname === '/mcp') {
       if (request.method === 'GET') {
@@ -118,7 +140,12 @@ export default {
       const body = await readJson(request);
       if (!body.ok) return json(400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: body.message } });
 
-      const result = await handleMcpMessage(body.value, env, { tools: TOOLS, generate: generateNextMessage, serverName: SERVER_NAME, serverVersion: SERVER_VERSION, protocolVersion: PROTOCOL_VERSION });
+      const result = await handleMcpMessage(body.value, env, toolDeps({
+        tools: TOOLS,
+        serverName: SERVER_NAME,
+        serverVersion: SERVER_VERSION,
+        protocolVersion: PROTOCOL_VERSION,
+      }));
       // A notification (no id) gets no body per JSON-RPC.
       if (result === undefined) return new Response(null, { status: 202 });
       return wantsSse(request) ? sse(result) : json(200, result, { 'mcp-protocol-version': PROTOCOL_VERSION });
@@ -138,7 +165,12 @@ function statusForCode(code) {
     case 'LLM_UNAVAILABLE':
       return 503;
     case 'GENERATION_REJECTED':
+    case 'INTENT_REJECTED':
       return 422;
+    case 'MODEL_OUTPUT_INVALID':
+      return 502;
+    case 'TOO_MANY_DECISION_OPTIONS':
+      return 400;
     default:
       return 500;
   }
