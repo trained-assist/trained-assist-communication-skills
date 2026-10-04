@@ -7,16 +7,23 @@
 // Everything here is pure: take a parsed JSON-RPC message + deps, return the
 // JSON-RPC reply (or `undefined` for a notification). No fetch, no fs, no env.
 
+import { buildIntentInputSchema, buildDecisionResultSchema } from '../intent-schema.mjs';
+
 export const SERVER_NAME = 'trained-assist-communication-skills';
-export const SERVER_VERSION = '0.2.0';
+export const SERVER_VERSION = '0.3.0';
 export const PROTOCOL_VERSION = '2024-11-05';
 
 export function toolResult(out) {
-  return {
+  const result = {
     content: [{ type: 'text', text: JSON.stringify(out.data) }],
     structuredContent: out.data,
     ...(out.isError ? { isError: true } : {}),
   };
+  // Diagnostics ride in `_meta` (JSON-RPC `Result._meta`), never in the payload:
+  // the resolver's public answer is exactly two fields, and a caller that parses
+  // `structuredContent` must not be able to depend on a diagnostic.
+  if (out.meta) result._meta = out.meta;
+  return result;
 }
 
 function ok(id, result) { return { jsonrpc: '2.0', id, result }; }
@@ -102,6 +109,11 @@ const INPUT_COMMON = {
 // NOT exposed over MCP any more: it existed so third-party generators could reuse
 // the guard, and with one tool in scope there is no such consumer. The guard is
 // still applied internally on every draft — it is not lost, only unexposed.
+//
+// The second tool is `resolve_user_intent` (issue #10): it formulates the user's
+// goal and picks exactly one id from the caller's closed list. It shares this
+// conversation with the writer — same JSON-RPC, same doors — but NOT the same
+// handler: two methods, two handlers, one protocol (ADR-0001).
 export const TOOLS = [
   {
     name: 'generate_next_message_to_conversation_partner',
@@ -112,15 +124,23 @@ export const TOOLS = [
       required: ['goal', 'communication_style', 'language', 'conversation_history'],
     },
   },
+  {
+    name: 'resolve_user_intent',
+    description: 'Infer the user\'s goal from the supplied input and context, then select exactly one of the caller-provided decision options. Return no_matching_option when none applies. Does not execute the selected decision.',
+    inputSchema: buildIntentInputSchema(),
+    outputSchema: buildDecisionResultSchema(),
+  },
 ];
 
 /**
  * One JSON-RPC message in, one reply out (or undefined for a notification).
  * @param {object} msg parsed JSON-RPC message
- * @param {object} deps { tools, generate, serverName, serverVersion, protocolVersion }
+ * @param {object} deps { tools, handlers, serverName, serverVersion, protocolVersion }
+ *   `handlers` maps a tool name to its application function; `generate` is kept as
+ *   the default so a driver that only wires the writer keeps working.
  */
 export async function handleMcpMessage(msg, env, deps) {
-  const { tools, generate, serverName, serverVersion, protocolVersion } = deps;
+  const { tools, handlers, generate, serverName, serverVersion, protocolVersion } = deps;
   const { id, method, params } = msg || {};
 
   switch (method) {
@@ -142,7 +162,11 @@ export async function handleMcpMessage(msg, env, deps) {
       if (!tool) {
         return ok(id, toolResult({ isError: true, data: { error: { code: 'UNKNOWN_TOOL', message: `неизвестный инструмент: ${name}` } } }));
       }
-      const out = await generate(params?.arguments ?? {}, env);
+      const handler = (handlers && handlers[name]) || generate;
+      if (typeof handler !== 'function') {
+        return ok(id, toolResult({ isError: true, data: { error: { code: 'HANDLER_NOT_WIRED', message: `инструмент ${name} объявлен, но его handler не подключён` } } }));
+      }
+      const out = await handler(params?.arguments ?? {}, env);
       return ok(id, toolResult(out));
     }
     default:

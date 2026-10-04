@@ -138,7 +138,7 @@ function deepHasKey(node, key, seen = new Set()) {
   return false;
 }
 
-/** tools/call → { isError, data } where data is the JSON payload if the server sent one. */
+/** tools/call → { isError, data, meta, text } where data is the JSON payload if the server sent one. */
 function unpack(result) {
   const isError = result?.isError === true;
   const structured = result?.structuredContent ?? null;
@@ -152,7 +152,7 @@ function unpack(result) {
     }
   }
   if (data === null) data = { _raw_text: texts.join('\n') };
-  return { isError, data, text: texts.join('\n') };
+  return { isError, data, meta: result?._meta ?? null, text: texts.join('\n') };
 }
 
 // ───────────────────────── ladder call counting ─────────────────────────
@@ -193,7 +193,7 @@ function materialise(node) {
  * violated expectations (empty = check passed). Separated from the transport so the
  * self-check can prove the engine itself is not vacuous before the handler exists.
  */
-function evaluateExpectations(exp, data, isError, calls, text = '', prompts = []) {
+function evaluateExpectations(exp, data, isError, calls, text = '', prompts = [], meta = null, rawCalls = []) {
   const problems = [];
 
   if (exp.ladder_calls !== undefined && calls !== exp.ladder_calls) {
@@ -209,6 +209,42 @@ function evaluateExpectations(exp, data, isError, calls, text = '', prompts = []
   const messageText = data && (data.message_text ?? (data.result && data.result.message_text));
   if (exp.status && (!data || data.status !== exp.status)) {
     problems.push(`status=${JSON.stringify(data && data.status)}, ожидалось "${exp.status}"`);
+  }
+  // resolve_user_intent: публичный ответ — ровно два поля, диагностика в _meta.
+  // Проверяется и то, и другое: иначе диагностику можно было бы положить в тело
+  // и остаться зелёными (issue #10 §2).
+  if (exp.kind === 'intent') {
+    if (exp.decision !== undefined && data?.decision !== exp.decision) {
+      problems.push(`decision=${JSON.stringify(data && data.decision)}, ожидалось "${exp.decision}"`);
+    }
+    if (exp.user_goal_nonempty === true && !(typeof data?.user_goal === 'string' && data.user_goal.trim())) {
+      problems.push('user_goal пуст');
+    }
+    if (exp.user_goal_nonempty === false && typeof data?.user_goal === 'string' && data.user_goal.trim()) {
+      problems.push(`user_goal неожиданно непуст: "${String(data.user_goal).slice(0, 80)}"`);
+    }
+    if (exp.exact_fields) {
+      const keys = Object.keys(data || {}).sort();
+      if (JSON.stringify(keys) !== JSON.stringify([...exp.exact_fields].sort())) {
+        problems.push(`поля ответа ${JSON.stringify(keys)}, ожидалось ровно ${JSON.stringify(exp.exact_fields)}`);
+      }
+    }
+    for (const f of exp.meta_fields || []) {
+      if (!deepHasKey(meta, f)) problems.push(`нет диагностики ${f} в _meta`);
+    }
+    // The schema is a REQUEST, and a request can be dropped without failing the call.
+    // Asserting it reached the provider is the only way to notice that regression.
+    if (exp.response_format_json_schema && rawCalls.length) {
+      const withSchema = rawCalls.filter((c) => c.response_format?.type === 'json_schema');
+      if (withSchema.length !== rawCalls.length) {
+        problems.push(`json_schema передан в ${withSchema.length} из ${rawCalls.length} вызовов лестницы`);
+      } else {
+        const enumValues = withSchema[0].response_format?.json_schema?.schema?.properties?.decision?.enum;
+        if (exp.decision_enum && JSON.stringify(enumValues) !== JSON.stringify(exp.decision_enum)) {
+          problems.push(`enum в схеме ${JSON.stringify(enumValues)}, ожидалось ${JSON.stringify(exp.decision_enum)}`);
+        }
+      }
+    }
   }
   if (exp.message_text_nonempty === true && !(typeof messageText === 'string' && messageText.trim())) {
     problems.push('message_text пуст');
@@ -249,7 +285,7 @@ function evaluateExpectations(exp, data, isError, calls, text = '', prompts = []
     if (prompts.some((p) => String(p).includes(needle))) problems.push(`в prompt к лестнице есть лишнее «${needle}»`);
   }
   if (!exp.typed_code && !data) problems.push(`нет разбираемого ответа; текст: ${String(text).slice(0, 160)}`);
-  if (!exp.typed_code && data && data.status === undefined && !problems.length) {
+  if (!exp.typed_code && exp.kind !== 'intent' && data && data.status === undefined && !problems.length) {
     problems.push(`в ответе нет status; текст: ${String(text).slice(0, 160)}`);
   }
 
@@ -271,13 +307,13 @@ async function runScenario(sc, client, ladder) {
     fatal(label, `JSON-RPC error: ${reply.error.code} ${reply.error.message}`);
     return;
   }
-  const { isError, data, text } = unpack(reply.result);
+  const { isError, data, meta, text } = unpack(reply.result);
   const after = await ladderCalls(ladder);
   // Prompts of THIS scenario's ladder calls only (slice the window we just measured),
   // so prompt_contains can assert on this call and not on a previous scenario's.
   const all = await fetchPrompts(ladder);
   const prompts = all.slice(before, after).map((c) => (Array.isArray(c.messages) ? c.messages.map((m) => m.content).join('\n') : ''));
-  const problems = evaluateExpectations(sc.expect || {}, data, isError, after - before, text, prompts);
+  const problems = evaluateExpectations(sc.expect || {}, data, isError, after - before, text, prompts, meta, all.slice(before, after));
   record('сценарий', label, problems.length === 0, problems.join(' · '));
 }
 
@@ -390,10 +426,11 @@ async function main() {
       const init = await client.request('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'sandbox-harness', version: '0.0.0' } });
       const listed = await client.request('tools/list', {});
       const names = (listed.result?.tools || []).map((t) => t.name);
-      const handshakeOk = record('сценарий', 'S1-mcp-handshake — initialize + tools/list отдаёт канонический инструмент со схемой',
+      const handshakeOk = record('сценарий', 'S1-mcp-handshake — initialize + tools/list отдаёт оба канонических инструмента со схемами',
         init.result?.serverInfo?.name === 'trained-assist-communication-skills'
         && names.includes('generate_next_message_to_conversation_partner')
-        && names.length === 1
+        && names.includes('resolve_user_intent')
+        && names.length === 2
         && (listed.result?.tools || []).every((t) => t.inputSchema && t.description),
         `serverInfo=${JSON.stringify(init.result?.serverInfo)}, tools=${JSON.stringify(names)}`);
       client.notify('notifications/initialized', {});

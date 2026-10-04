@@ -24,6 +24,11 @@ function joinUrl(base, path) {
  * Any non-2xx / network / timeout / empty answer → LadderError (the caller maps it to
  * a typed LLM_UNAVAILABLE error; there is deliberately NO client-side retry here —
  * the ladder already retries its rungs internally and the budget belongs to the caller).
+ *
+ * `responseFormat` is passed through untouched. The ladder forwards it to the
+ * provider and, on a 400 that names structured outputs, retries the SAME rung
+ * without it — so a schema we send is a request, never a reason to lose the call.
+ * The caller still validates the answer itself (issue #10 §7).
  */
 export async function ladderChat({
   baseUrl,
@@ -34,6 +39,7 @@ export async function ladderChat({
   maxTokens = 800,
   timeoutMs = 20000,
   app = 'communication-skills',
+  responseFormat = null,
 } = {}) {
   if (!baseUrl) throw new LadderError('LLM_LADDER_URL не задан — общая лестница недоступна');
   if (!Array.isArray(messages) || !messages.length) throw new LadderError('ladderChat: пустой messages');
@@ -45,6 +51,7 @@ export async function ladderChat({
     max_tokens: maxTokens,
     ladder_timeout_ms: timeoutMs,
   };
+  if (responseFormat) body.response_format = responseFormat;
 
   let res;
   try {

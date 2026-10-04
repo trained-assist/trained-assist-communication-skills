@@ -8,6 +8,9 @@
 import { ladderChat, LadderError } from './ladder.mjs';
 import { renderWriterPrompt } from './prompt.mjs';
 import { extractDialogState, renderDialogState, stateMetrics } from './dialog-state.mjs';
+import { TypedError, logEvent } from './typed-error.mjs';
+
+export { TypedError };
 
 export const CONTRACT_VERSION = 'v1';
 export const PROMPT_VERSION = 'p1';
@@ -37,20 +40,6 @@ const POINT_STOP = new Set([
   'также', 'очень', 'этот', 'этого', 'чтобы', 'также', 'назовите', 'назови', 'скажите',
   'расскажите', 'укажите', 'уточните', 'спросите', 'напишите',
 ]);
-
-export class TypedError extends Error {
-  constructor(code, message, details = {}) {
-    super(message);
-    this.name = 'TypedError';
-    this.code = code;
-    this.details = details;
-  }
-}
-
-// Telemetry: только идентификаторы, статусы и размеры — ни текста диалогов, ни PII (R9).
-function logEvent(evt, fields) {
-  try { console.error(`[communication] ${JSON.stringify({ evt, ...fields })}`); } catch { /* stderr best-effort */ }
-}
 
 // ───────────────────────── вход: нормализация и проверки ─────────────────────────
 

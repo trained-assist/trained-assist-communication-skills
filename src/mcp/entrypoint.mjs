@@ -6,16 +6,15 @@
 // Cloudflare Worker door (src/index.mjs). Logic added here would be a second
 // implementation, which is exactly what ADR-0001 forbids.
 
-import { generateNextMessage } from '../handler.mjs';
 import { TOOLS, SERVER_NAME, SERVER_VERSION, PROTOCOL_VERSION, handleMcpMessage } from './protocol.mjs';
+import { toolDeps } from './registry.mjs';
 
-const deps = {
+const deps = toolDeps({
   tools: TOOLS,
-  generate: generateNextMessage,
   serverName: SERVER_NAME,
   serverVersion: SERVER_VERSION,
   protocolVersion: PROTOCOL_VERSION,
-};
+});
 
 function write(msg) {
   process.stdout.write(`${JSON.stringify(msg)}\n`);

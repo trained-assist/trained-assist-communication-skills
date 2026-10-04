@@ -3,11 +3,13 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Cloudflare Worker: один MCP-метод написания следующего сообщения в диалоге (write-next-message), без VM",
+  "description": "Cloudflare Worker: два MCP-метода — написания следующего сообщения в диалоге и определения цели пользователя с выбором из заданных решений, без VM",
   "scripts": {
-    "check": "node --check src/index.mjs && node --check src/handler.mjs && node --check src/prompt.mjs && node --check src/ladder.mjs && node --check src/dialog-state.mjs && node --check src/mcp/protocol.mjs && node --check src/mcp/entrypoint.mjs",
+    "check": "node --check src/index.mjs && node --check src/handler.mjs && node --check src/prompt.mjs && node --check src/ladder.mjs && node --check src/dialog-state.mjs && node --check src/typed-error.mjs && node --check src/intent-schema.mjs && node --check src/intent-prompt.mjs && node --check src/intent-guard.mjs && node --check src/intent-handler.mjs && node --check src/mcp/protocol.mjs && node --check src/mcp/registry.mjs && node --check src/mcp/entrypoint.mjs && node --check scripts/corpus/run.mjs",
     "test": "node --test test/*.test.mjs",
     "sandbox": "bash scripts/sandbox/run.sh",
+    "corpus": "node scripts/corpus/run.mjs --offline --verbose",
+    "corpus:live": "node scripts/corpus/run.mjs --live --verbose",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "gate": "npm run check && npm test && npm run sandbox"
