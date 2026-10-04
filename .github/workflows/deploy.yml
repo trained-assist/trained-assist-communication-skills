@@ -16,4 +16,9 @@ jobs:
           node-version: '22'
           cache: 'npm'
       - run: npm ci
-      - run: echo "diag ok"
+      - name: wrangler-action
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          accountId: ${{ secrets.CF_ACCOUNT_ID }}
+          command: deploy --config wrangler.jsonc
