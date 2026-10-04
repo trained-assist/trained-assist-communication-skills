@@ -399,7 +399,13 @@ export async function resolveUserIntent(raw, env = {}) {
     // Сжатие ДО подсчёта размера и рендера: сжатый вход — это и есть то, что уйдёт
     // модели, и метрики обязаны описывать именно его, иначе «покрытие» и «сколько
     // токенов» будут рассказывать про текст, которого в запросе не было.
-    const { input, reports } = compressIntentInput(validated);
+    //
+    // INTENT_COMPRESS=off — только для замера «полный контекст против сжатия»
+    // (issue #10 §9 требует такое сравнение). В проде флаг не выставляется: сжатие
+    // включается само, когда событие длиннее порога.
+    const { input, reports } = env.INTENT_COMPRESS === 'off'
+      ? { input: validated, reports: [] }
+      : compressIntentInput(validated);
     const metrics = intentInputMetrics(input);
     metrics.compression = compressionMetrics(reports);
     assertFits(metrics, requestId);
