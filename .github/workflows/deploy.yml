@@ -18,6 +18,9 @@ jobs:
   deploy-staging:
     runs-on: ubuntu-latest
     timeout-minutes: 8
+    outputs:
+      worker: ${{ steps.preview.outputs.worker }}
+      url: ${{ steps.preview.outputs.url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,14 +46,6 @@ jobs:
           # The staging worker is a SEPARATE script name, so it never overwrites the
           # production worker. Same source, same secrets, different name — that is
           # what makes a staging answer comparable to a production one.
-          preCommands: |
-            cp wrangler.jsonc wrangler.staging.jsonc
-            node -e "
-              const fs=require('fs');
-              const c=JSON.parse(fs.readFileSync('wrangler.staging.jsonc','utf8').replace(/^\s*\/\/.*$/gm,''));
-              c.name = process.env.STAGING_WORKER;
-              fs.writeFileSync('wrangler.staging.jsonc', JSON.stringify(c, null, 2));
-            "
           command: deploy --config wrangler.staging.jsonc --var BUILD_SHA:${{ github.sha }}
         env:
           STAGING_WORKER: ${{ steps.preview.outputs.worker }}
@@ -94,6 +89,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 8
+    needs: [deploy-staging, smoke-staging]
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     steps:
       - uses: actions/checkout@v4
@@ -131,6 +127,7 @@ jobs:
     name: staging-deploy-and-smoke
     runs-on: ubuntu-latest
     timeout-minutes: 2
+    needs: [deploy-staging, smoke-staging]
     if: always()
     steps:
       - name: Require staging deploy and smoke to succeed
