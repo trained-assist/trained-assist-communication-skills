@@ -473,3 +473,13 @@ test('MCP tools/call неизвестного инструмента → UNKNOWN
   assert.equal(result.isError, true);
   assert.equal(result.structuredContent.error.code, 'UNKNOWN_TOOL');
 });
+
+ test('dedicated HH token preserves existing consumer bearer', async () => {
+  const env={...ENV, HH_COMMUNICATION_TOKEN:'hh-fixture-only'};
+  for(const token of [TOKEN,'hh-fixture-only']) {
+    const res=await worker.fetch(new Request('https://example.test/mcp',{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/list'})}),env);
+    assert.equal(res.status,200);
+  }
+  const res=await worker.fetch(new Request('https://example.test/mcp',{method:'POST',headers:{Authorization:'Bearer wrong','Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/list'})}),env);
+  assert.equal(res.status,401);
+ });

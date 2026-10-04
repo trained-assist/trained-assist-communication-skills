@@ -51,15 +51,17 @@ function wantsSse(request) {
  * authorised" sends the caller hunting for a token that does not exist.
  */
 function authorized(request, env) {
-  const token = env.COMMUNICATION_TOKEN;
-  if (!token) return { ok: false, status: 500, code: 'NOT_CONFIGURED', message: 'COMMUNICATION_TOKEN не задан (wrangler secret put COMMUNICATION_TOKEN)' };
+  const tokens = [env.COMMUNICATION_TOKEN, env.HH_COMMUNICATION_TOKEN].filter(Boolean);
+  if (!tokens.length) return { ok: false, status: 500, code: 'NOT_CONFIGURED', message: 'COMMUNICATION_TOKEN не задан (wrangler secret put COMMUNICATION_TOKEN)' };
   const got = String(request.headers.get('authorization') || '');
-  const expected = `Bearer ${token}`;
-  // Length-equal compare; both sides are fixed-shape bearer tokens.
-  if (got.length !== expected.length) return { ok: false, status: 401, code: 'UNAUTHORIZED', message: 'unauthorized' };
-  let diff = 0;
-  for (let i = 0; i < expected.length; i += 1) diff |= got.charCodeAt(i) ^ expected.charCodeAt(i);
-  return diff === 0 ? { ok: true } : { ok: false, status: 401, code: 'UNAUTHORIZED', message: 'unauthorized' };
+  let matched = false;
+  for (const token of tokens) {
+    const expected = `Bearer ${token}`;
+    let diff = got.length ^ expected.length;
+    for (let i = 0; i < expected.length; i += 1) diff |= (got.charCodeAt(i) || 0) ^ expected.charCodeAt(i);
+    matched = matched || diff === 0;
+  }
+  return matched ? { ok: true } : { ok: false, status: 401, code: 'UNAUTHORIZED', message: 'unauthorized' };
 }
 
 async function readJson(request) {
