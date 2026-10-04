@@ -1,6 +1,7 @@
 'use strict';
 
 import { ladderChat, LadderError } from './ladder.mjs';
+import { remainingMethodBudget } from './method-budget.mjs';
 import { parseLooseJson } from './intent-schema.mjs';
 import { buildGoalDecisionSchema, validateGoalDecision } from './goal-schema.mjs';
 import { renderGoalPrompt } from './goal-prompt.mjs';
@@ -77,12 +78,13 @@ export async function evaluateNextGoal(raw, env = {}) {
       if (attempt > 1) callMessages[callMessages.length - 1] = { role: 'user', content: `${callMessages.at(-1).content}\n\nPrevious answer failed validation: ${rejected.at(-1).join('; ')}. Return corrected JSON only.` };
       let response;
       try {
-        response = await ladderChat({ baseUrl: env.LLM_LADDER_URL, token: env.LLM_LADDER_TOKEN, model: GOAL_LADDER_NAME, messages: callMessages, temperature: 0, maxTokens: 400, responseFormat: { type: 'json_schema', json_schema: { name: 'next_communication_goal', strict: true, schema } }, app: 'communication-skills-goal' });
+        response = await ladderChat({ baseUrl: env.LLM_LADDER_URL, token: env.LLM_LADDER_TOKEN, model: GOAL_LADDER_NAME, messages: callMessages, temperature: 0, maxTokens: 400, responseFormat: { type: 'json_schema', json_schema: { name: 'next_communication_goal', strict: true, schema } }, app: 'communication-skills-goal', totalTimeoutMs: remainingMethodBudget(started, attempt - 1) });
       } catch (e) {
         if (e instanceof LadderError) throw new TypedError('LLM_UNAVAILABLE', `shared ladder ${GOAL_LADDER_NAME} unavailable: ${e.message}`, { attempts: attempt });
         throw e;
       }
       const checked = validateGoalDecision(parseLooseJson(response.content), input.material_bindings ?? null);
+      remainingMethodBudget(started, attempt);
       if (checked.ok) {
         return successfulResult({
           ...checked.value,

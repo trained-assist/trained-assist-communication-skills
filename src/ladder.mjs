@@ -38,9 +38,12 @@ export async function ladderChat({
   temperature = 0.7,
   maxTokens = 800,
   timeoutMs = 20000,
+  totalTimeoutMs = 60000,
   app = 'communication-skills',
   responseFormat = null,
 } = {}) {
+  if (!Number.isFinite(totalTimeoutMs) || totalTimeoutMs <= 0) throw new LadderError('ladderChat: invalid total timeout budget');
+  totalTimeoutMs = Math.floor(totalTimeoutMs);
   if (!baseUrl) throw new LadderError('LLM_LADDER_URL не задан — общая лестница недоступна');
   if (!Array.isArray(messages) || !messages.length) throw new LadderError('ladderChat: пустой messages');
 
@@ -50,6 +53,7 @@ export async function ladderChat({
     temperature,
     max_tokens: maxTokens,
     ladder_timeout_ms: timeoutMs,
+    ladder_total_timeout_ms: totalTimeoutMs,
   };
   if (responseFormat) body.response_format = responseFormat;
 
@@ -63,7 +67,7 @@ export async function ladderChat({
         'x-ladder-app': app,
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(timeoutMs + 5000),
+      signal: AbortSignal.timeout(totalTimeoutMs + 5000),
     });
   } catch (e) {
     throw new LadderError(`лестница недоступна: ${e.name === 'TimeoutError' ? 'таймаут' : e.message}`);
