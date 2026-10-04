@@ -6,6 +6,7 @@
 // телеметрия без PII.
 
 import { ladderChat, LadderError } from './ladder.mjs';
+import { remainingMethodBudget } from './method-budget.mjs';
 import { renderWriterPrompt } from './prompt.mjs';
 import { extractDialogState, renderDialogState, stateMetrics } from './dialog-state.mjs';
 import { TypedError, logEvent } from './typed-error.mjs';
@@ -515,6 +516,7 @@ export async function generateNextMessage(raw, env = {}) {
           messages,
           temperature: profile.temperature,
           maxTokens: profile.maxTokens,
+          totalTimeoutMs: remainingMethodBudget(t0, attempt - 1),
         });
       } catch (e) {
         if (e instanceof LadderError) {
@@ -525,6 +527,7 @@ export async function generateNextMessage(raw, env = {}) {
       }
 
       const verdict = runGuard({ input, draft: call.content, state });
+      remainingMethodBudget(t0, attempt);
       if (verdict.verdict === 'ok') {
         logEvent('generate', { request_id: requestId, status: 'generated', attempts: attempt, input_chars: metrics.total_chars, total_ms: Date.now() - t0 });
         return {

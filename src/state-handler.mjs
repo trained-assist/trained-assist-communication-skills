@@ -1,6 +1,7 @@
 'use strict';
 
 import { ladderChat, LadderError } from './ladder.mjs';
+import { remainingMethodBudget } from './method-budget.mjs';
 import { parseLooseJson } from './intent-schema.mjs';
 import { buildStateResultSchema, validateStateResult, validateSupportedStateSchema } from './state-schema.mjs';
 import { renderStatePrompt } from './state-prompt.mjs';
@@ -190,6 +191,7 @@ export async function extractConversationState(raw, env = {}) {
             json_schema: { name: 'conversation_state', strict: true, schema: resultSchema },
           },
           app: 'communication-skills-state',
+          totalTimeoutMs: remainingMethodBudget(t0, attempt - 1),
         });
       } catch (e) {
         if (e instanceof LadderError) {
@@ -201,6 +203,7 @@ export async function extractConversationState(raw, env = {}) {
 
       const parsed = parseLooseJson(res.content);
       const checked = validateStateResult(parsed, input.state_schema);
+      remainingMethodBudget(t0, attempt);
       if (checked.ok) {
         const data = {
           state: checked.value.state,
