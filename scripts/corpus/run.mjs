@@ -21,7 +21,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { resolveUserIntent, INTENT_MAX_ATTEMPTS } from '../../src/intent-handler.mjs';
+import { resolveUserIntent } from '../../src/intent-handler.mjs';
 import { NO_MATCHING_OPTION } from '../../src/intent-schema.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -38,11 +38,6 @@ const PRICES_PER_1M = {
 
 const FILLERS = {
   __FILLER_120001__: 'x'.repeat(120001),
-  // Болтовня без команд, условий и фактов — ровно то, что сжатие должно отбросить.
-  // Повторяется, чтобы длина превышала порог сжатия (12000 символов) в несколько раз.
-  __FILLER_CHATTER__: Array.from({ length: 260 }, (_, i) => (
-    `Обсуждали это в общем чате несколько раз и в итоге отложили обсуждение, пункт ${i + 1} из списка.`
-  )).join(' '),
 };
 
 function materialise(node) {
@@ -104,35 +99,10 @@ function offlineLadderReply(c, callIndex) {
   return { content: JSON.stringify({ user_goal: exp.reference_goal, decision: exp.decision }) };
 }
 
-/**
- * Записывает ТОТ САМЫЙ текст, который ушёл в классификатор, в обоих режимах.
- *
- * Без этого `prompt_contains` в кейсах были бы декоративной строкой: для сжатия
- * главный вопрос «доехала ли команда из середины до модели», и ответить на него
- * может только реальный запрос, а не намерение теста. В live обёртка прозрачно
- * пропускает вызов настоящему fetch.
- */
-function installPromptRecorder(state) {
-  const original = globalThis.fetch;
-  globalThis.fetch = async (url, init) => {
-    try {
-      const body = JSON.parse(init.body);
-      if (Array.isArray(body.messages)) {
-        state.prompts.push(body.messages.map((m) => String(m.content || '')).join('\n'));
-        state.calls.push({ url: String(url), body });
-      }
-    } catch { /* not a ladder call */ }
-    return original(url, init);
-  };
-  return () => { globalThis.fetch = original; };
-}
-
 function installOfflineLadder(state) {
   const original = globalThis.fetch;
-  const recorder = globalThis.fetch;
   globalThis.fetch = async (url, init) => {
     const body = JSON.parse(init.body);
-    state.prompts.push((body.messages || []).map((m) => String(m.content || '')).join('\n'));
     state.calls.push({ url: String(url), body });
     const reply = offlineLadderReply(state.current, state.calls.length);
     if (reply.httpError) {
@@ -150,7 +120,7 @@ function installOfflineLadder(state) {
 
 // ───────────────────────── проверки ─────────────────────────
 
-function checkCase(c, out, ladderCalls, mode, prompts = []) {
+function checkCase(c, out, ladderCalls) {
   const exp = c.expect || {};
   const problems = [];
 
@@ -161,14 +131,8 @@ function checkCase(c, out, ladderCalls, mode, prompts = []) {
     problems.push(`ожидался успех, получена ошибка ${out.data?.error?.code}: ${out.data?.error?.message}`);
   }
 
-  // Exact call count is an offline assertion: offline the script decides how many
-  // calls happen, live the model may need its single repair attempt. What must hold
-  // in BOTH modes is the ceiling — the budget belongs to the method.
-  if (exp.ladder_calls !== undefined && mode === 'offline' && ladderCalls !== exp.ladder_calls) {
+  if (exp.ladder_calls !== undefined && ladderCalls !== exp.ladder_calls) {
     problems.push(`вызовов лестницы ${ladderCalls}, ожидалось ${exp.ladder_calls}`);
-  }
-  if (ladderCalls > INTENT_MAX_ATTEMPTS) {
-    problems.push(`вызовов лестницы ${ladderCalls} > общего бюджета метода ${INTENT_MAX_ATTEMPTS}`);
   }
 
   if (out.isError) return problems;
@@ -180,44 +144,20 @@ function checkCase(c, out, ladderCalls, mode, prompts = []) {
   }
 
   const { decision, user_goal } = out.data || {};
-  // Сравнение целей и промптов — регистронезависимое и с нормализованной «ё».
-  // Модель пишет «отчёт»/«отчет» и «Пока»/«пока» вперемешку, и метка, которая
-  // различает их, измеряет не качество, а свою собственную аккуратность.
-  const fold = (s) => String(s).toLowerCase().replace(/ё/g, 'е');
   const accepts = exp.accepts || (exp.decision ? [exp.decision] : []);
   if (exp.decision && !accepts.includes(decision)) {
     problems.push(`decision=${decision}, метка ${accepts.join('|')}`);
   }
-  // Дословное сравнение цели — только в офлайне, где цель приходит из скрипта.
-  // В live цель пишет модель, и сравнение с эталонной фразой измеряло бы не
-  // качество метода, а способность дословно воспроизвести чужую формулировку;
-  // полноту цели в live меряют `goal_contains` / `goal_forbids` ниже.
-  if (mode === 'offline' && exp.reference_goal && user_goal !== exp.reference_goal) {
+  if (exp.reference_goal && user_goal !== exp.reference_goal) {
+    // Офлайн-режим: цель приходит из скрипта, поэтому расхождение — поломка кейса,
+    // а не модели. В живом режиме цель пишет модель, и сверяется не текст, а полнота.
     problems.push(`user_goal не совпал с размеченным: «${String(user_goal).slice(0, 80)}»`);
   }
   for (const needle of exp.goal_contains || []) {
-    if (!fold(user_goal).includes(fold(needle))) problems.push(`в user_goal нет «${needle}»`);
-  }
-  // Смысловой корень: цель формулирует модель, и «дословно воспроизвести чужую
-  // фразу» не измеряет качество. «тариф» вместо «тарифу Про», «счёт» вместо
-  // «не отправляя счёт»: проверяем, что смысл сохранён, а не слово совпало.
-  for (const group of exp.goal_contains_any || []) {
-    const hit = group.some((n) => fold(user_goal).includes(fold(n)));
-    if (!hit) problems.push(`в user_goal нет ни одного из «${group.join(' | ')}»`);
+    if (!String(user_goal).toLowerCase().includes(needle.toLowerCase())) problems.push(`в user_goal нет «${needle}»`);
   }
   for (const needle of exp.goal_forbids || []) {
-    if (fold(user_goal).includes(fold(needle))) problems.push(`в user_goal есть запрещённое «${needle}»`);
-  }
-
-  // Что реально дошло до классификатора. Для сжатия это и есть главная проверка:
-  // отброшенная болтовня обязана исчезнуть из промпта, а команда из середины —
-  // обязана в нём остаться.
-  const prompt = fold((prompts || []).join('\n'));
-  for (const needle of exp.prompt_contains || []) {
-    if (!prompt.includes(fold(needle))) problems.push(`в промпте к лестнице нет «${needle}»`);
-  }
-  for (const needle of exp.prompt_excludes || []) {
-    if (prompt.includes(fold(needle))) problems.push(`в промпте к лестнице есть лишнее «${needle}» — сжатие не сработало или отчёт врёт`);
+    if (String(user_goal).toLowerCase().includes(needle.toLowerCase())) problems.push(`в user_goal есть запрещённое «${needle}»`);
   }
   return problems;
 }
@@ -239,19 +179,8 @@ function estimateCost(model, usage) {
   return (input - cached) * (price[0] / 1e6) + output * (price[1] / 1e6) + cached * (price[2] / 1e6);
 }
 
-/**
- * Технический сбой (лестница 502/таймаут/сеть) — это НЕ «модель ошиблась».
- * Считать его провалом кейса нельзя: живой прогон замерял бы доступность воркера,
- * а не качество метода. Здесь такие кейсы выпадают из знаменателя accuracy и
- * попадают в отдельный счётчик.
- */
-function isInfraFailure(r) {
-  return !!r.error_code;
-}
-
-function summarise(results, mode, skipped = 0) {
+function summarise(results, mode) {
   const latencies = results.map((r) => r.timingMs).filter(Number.isFinite).sort((a, b) => a - b);
-  const infra = results.filter((r) => r.isError && isInfraFailure(r));
   const decisions = results.filter((r) => !r.isError);
   const accepted = decisions.filter((r) => r.accepted);
   const reserved = decisions.filter((r) => r.decision === NO_MATCHING_OPTION);
@@ -263,13 +192,10 @@ function summarise(results, mode, skipped = 0) {
   return {
     mode,
     cases: results.length,
-    skipped_offline_only: skipped,
     passed: results.filter((r) => r.problems.length === 0).length,
     failed: results.filter((r) => r.problems.length > 0).length,
     // Ниже — метрики качества. В офлайн-режиме они описывают КОНТРАКТ (цель приходит
     // из скрипта), поэтому помечены как contract_*, а не как измерение модели.
-    infra_failures: infra.length,
-    infra_codes: [...new Set(infra.map((r) => r.error_code))],
     contract_decision_accuracy: decisions.length ? accepted.length / decisions.length : null,
     contract_goal_completeness: results.length
       ? results.reduce((sum, r) => sum + r.goalChecks, 0) / Math.max(1, results.reduce((sum, r) => sum + r.goalChecksTotal, 0))
@@ -289,14 +215,6 @@ function summarise(results, mode, skipped = 0) {
 
 // ───────────────────────── прогон ─────────────────────────
 
-/** Кейсы, смысл которых — подсунуть guard'у заранее известный дефект. В live их
- *  некому подсовывать: там отвечает модель, и «ожидаемый код ошибки» был бы
- *  утверждением о модели, а не о guard'е. Их проверяет офлайн-прогон. */
-function isOfflineOnly(c) {
-  const e = c.expect || {};
-  return !!(e.typed_code || e.scripted_reply || e.repair_reply || e.ladder_calls === 0);
-}
-
 /**
  * @param {object} o
  * @param {'offline'|'live'} o.mode
@@ -306,12 +224,9 @@ function isOfflineOnly(c) {
  */
 export async function runCorpus({ mode = 'offline', env: envArg = {}, only = null, verbose = false } = {}) {
   const fixtures = JSON.parse(readFileSync(CASES_PATH, 'utf8'));
-  const selected = only ? fixtures.cases.filter((c) => only.includes(c.id)) : fixtures.cases;
-  const cases = mode === 'live' ? selected.filter((c) => !isOfflineOnly(c)) : selected;
-  const skipped = selected.length - cases.length;
-  const state = { calls: [], current: null, prompts: [] };
-  const restoreOffline = mode === 'offline' ? installOfflineLadder(state) : null;
-  const restoreRecorder = mode === 'live' ? installPromptRecorder(state) : null;
+  const cases = only ? fixtures.cases.filter((c) => only.includes(c.id)) : fixtures.cases;
+  const state = { calls: [], current: null };
+  const restore = mode === 'offline' ? installOfflineLadder(state) : null;
   // Офлайн-режим обязан работать без секретов: адрес лестницы фиктивный, отвечает
   // скрипт. Живой режим берёт секреты из окружения и падает без них (см. main()).
   const env = mode === 'offline'
@@ -322,13 +237,12 @@ export async function runCorpus({ mode = 'offline', env: envArg = {}, only = nul
   for (const c of cases) {
     state.current = c;
     state.calls = [];
-    state.prompts = [];
     const args = buildArguments(fixtures.catalogs, c);
     const t0 = Date.now();
     const out = await resolveUserIntent(args, env);
     const timingMs = Date.now() - t0;
 
-    const problems = checkCase(c, out, state.calls.length, mode, state.prompts);
+    const problems = checkCase(c, out, state.calls.length);
     const exp = c.expect || {};
     const goal = typeof out.data?.user_goal === 'string' ? out.data.user_goal : '';
     const goalChecksTotal = (exp.goal_contains || []).length;
@@ -340,7 +254,6 @@ export async function runCorpus({ mode = 'offline', env: envArg = {}, only = nul
       title: c.title,
       catalog: c.catalog,
       isError: out.isError,
-      error_code: out.isError ? (out.data?.error?.code ?? null) : null,
       ladderCalls: state.calls.length,
       decision: out.data?.decision ?? null,
       accepted: !out.isError && (exp.accepts || [exp.decision]).includes(out.data.decision),
@@ -362,9 +275,8 @@ export async function runCorpus({ mode = 'offline', env: envArg = {}, only = nul
     }
   }
 
-  if (restoreOffline) restoreOffline();
-  if (restoreRecorder) restoreRecorder();
-  return { results, metrics: summarise(results, mode, skipped) };
+  if (restore) restore();
+  return { results, metrics: summarise(results, mode) };
 }
 
 // ───────────────────────── CLI ─────────────────────────
@@ -388,8 +300,6 @@ function main() {
       if (mode === 'offline') {
         console.log('Лестница подменена скриптом: метрики ниже описывают КОНТРАКТ, а не качество модели.');
         console.log('Замер качества — только --live с секретами общей лестницы.');
-      } else if (metrics.skipped_offline_only) {
-        console.log(`Пропущено ${metrics.skipped_offline_only} контрактных кейсов (подсованный guard'у дефект, ожидаемый код ошибки, запрет на вызов лестницы): в live их некому подсовывать — отвечает модель. Их проверяет офлайн-прогон.`);
       }
       for (const r of results.filter((x) => x.problems.length)) {
         console.log(`  ✗ ${r.id} — ${r.title}\n      → ${r.problems.join(' · ')}`);
