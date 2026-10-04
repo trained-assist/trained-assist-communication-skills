@@ -215,6 +215,31 @@ test('успех: ровно два поля, диагностика отдел�
   } finally { stub.restore(); }
 });
 
+test("резолвер идёт в classify-лестницу, а не в conversation лестницу writer'а", async () => {
+  // Это не вкусовое решение, а разные задачи: writer пишет текст человеку,
+  // резолвер выбирает id из закрытого списка. У conversation первые ранг-и
+  // платные OpenRouter, где осознанно ловится 402 (19% отказов за 24 ч);
+  // service:classify — free-first и с нулём сбоев.
+  const stub = stubLadder({ replies: [{ content: JSON.stringify(OK) }] });
+  try {
+    await resolveUserIntent(validArgs(), ENV);
+    assert.equal(stub.calls[0].body.model, 'service:classify');
+  } finally { stub.restore(); }
+});
+
+test('имя лестницы переопределяется для сравнения моделей (issue #10 §7)', async () => {
+  const stub = stubLadder({ replies: [{ content: JSON.stringify(OK) }] });
+  const saved = process.env.LLM_LADDER_NAME;
+  try {
+    process.env.LLM_LADDER_NAME = 'conversation';
+    const { INTENT_LADDER_NAME } = await import('../src/intent-handler.mjs?ladder-override');
+    assert.equal(INTENT_LADDER_NAME, 'conversation');
+  } finally {
+    if (saved === undefined) delete process.env.LLM_LADDER_NAME; else process.env.LLM_LADDER_NAME = saved;
+    stub.restore();
+  }
+});
+
 test('запрос уходит в общую лестницу с json_schema и нулевой температурой', async () => {
   const stub = stubLadder({ replies: [{ content: JSON.stringify(OK) }] });
   try {
@@ -222,7 +247,7 @@ test('запрос уходит в общую лестницу с json_schema и
     assert.equal(stub.calls.length, 1);
     const { url, body } = stub.calls[0];
     assert.equal(url, 'http://ladder.test/v1/chat/completions');
-    assert.equal(body.model, 'conversation');
+    assert.equal(body.model, 'service:classify');
     assert.equal(body.temperature, 0);
     assert.equal(body.response_format.type, 'json_schema');
     assert.equal(body.response_format.json_schema.strict, true);

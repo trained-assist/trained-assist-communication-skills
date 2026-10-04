@@ -20,12 +20,28 @@
 import { ladderChat, LadderError } from './ladder.mjs';
 import { renderIntentPrompt } from './intent-prompt.mjs';
 import { runIntentGuard } from './intent-guard.mjs';
+import { compressIntentInput, compressionMetrics, compressionWarnings } from './intent-compress.mjs';
 import { buildDecisionOutputSchema, parseLooseJson, NO_MATCHING_OPTION } from './intent-schema.mjs';
 import { TypedError, logEvent } from './typed-error.mjs';
 
 export const INTENT_CONTRACT_VERSION = 'v1';
 export const INTENT_PROMPT_VERSION = 'ip1';
-export const INTENT_LADDER_NAME = 'conversation';
+
+// ЛЕСТНИЦА РЕЗОЛВЕРА — НЕ ЛЕСТНИЦА WRITER'А.
+//
+// Writer пишет текст пользователю, ему нужен живой ответ и качество формулировки:
+// лестница `conversation`. Резолвер не пишет ничего — он выбирает один id из
+// закрытого списка и формулирует цель. Это классификация, и лестница под неё уже
+// настроена: `service:classify` — free-first (все ранг-и бесплатные), 225 вызовов
+// за 24 ч с нулём сбоев. У `conversation` первые два ранг-а платные OpenRouter, и
+// там осознанно ловится 402 «Insufficient credits» — то есть 19% отказов на 24 ч.
+//
+// Решение владельца 17.10.2026: резолверу не нужен `conversation`, ему нужен
+// `classify`. Проверено корпусом на живой лестнице — цифры в docs.
+//
+// `LLM_LADDER_NAME` переопределяет имя для сравнения моделей (issue #10 §7:
+// «конкретную модель выбрать сравнением размеченных кейсов»). Прод без флага.
+export const INTENT_LADDER_NAME = process.env.LLM_LADDER_NAME || 'service:classify';
 
 // Общий retry budget метода: одна попытка + максимум одна ремонтная. Всё.
 // Множить его с retry лестницы нельзя — бюджет принадлежит методу (ADR-0001).
@@ -393,8 +409,20 @@ export async function resolveUserIntent(raw, env = {}) {
   const traceId = nonEmptyString(raw?.trace_id) ? raw.trace_id.trim() : requestId;
 
   try {
-    const input = normalizeIntent(raw);
+    const validated = normalizeIntent(raw);
+
+    // Сжатие ДО подсчёта размера и рендера: сжатый вход — это и есть то, что уйдёт
+    // модели, и метрики обязаны описывать именно его, иначе «покрытие» и «сколько
+    // токенов» будут рассказывать про текст, которого в запросе не было.
+    //
+    // INTENT_COMPRESS=off — только для замера «полный контекст против сжатия»
+    // (issue #10 §9 требует такое сравнение). В проде флаг не выставляется: сжатие
+    // включается само, когда событие длиннее порога.
+    const { input, reports } = env.INTENT_COMPRESS === 'off'
+      ? { input: validated, reports: [] }
+      : compressIntentInput(validated);
     const metrics = intentInputMetrics(input);
+    metrics.compression = compressionMetrics(reports);
     assertFits(metrics, requestId);
     const profile = resolveIntentModelProfile(input.model_profile);
 
@@ -457,7 +485,7 @@ export async function resolveUserIntent(raw, env = {}) {
           usage: usageFromLadder(res.usage),
           timing: { total_ms: Date.now() - t0 },
           input_metrics: metrics,
-          warnings: collectIntentWarnings(input),
+          warnings: collectIntentWarnings(input).concat(compressionWarnings(reports)),
         };
         logEvent('intent', {
           request_id: requestId,
