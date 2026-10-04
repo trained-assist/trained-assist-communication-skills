@@ -81,6 +81,7 @@ function serveHealth(env) {
     contract_version: CONTRACT_VERSION,
     prompt_version: PROMPT_VERSION,
     ladder_configured: configured,
+    capabilities: ['conversation-state-context-v1', 'free-goal-material-execution-v1'],
   });
 }
 

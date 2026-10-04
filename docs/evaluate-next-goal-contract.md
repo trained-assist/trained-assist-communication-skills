@@ -60,3 +60,7 @@ POST /mcp tools/call evaluate_next_goal
 ```
 
 Errors: `VALIDATION_ERROR` (400), `INPUT_TOO_LARGE` (400), `MODEL_PROFILE_NOT_ALLOWED` (400), `LLM_UNAVAILABLE` (503), `GOAL_REJECTED` (422).
+
+## Optional verbatim-material execution (#HH142 S0)
+
+Caller may supply `material_bindings:[{stage_id:"stable-id"}]`. This is a set of saved material references, not a closed goal catalog. The goal remains freely formulated. For an actual saved-material delivery, the result additionally contains `execution:{type:"send_material",stage_id:"stable-id"}`; the server validates that the ID was provided. Other messages have null/write_message execution; terminal statuses have null execution. HH resolves the exact text and snapshot, guards duplicate/unknown outcomes, and does not invoke writer for send_material. With no material_bindings the old response shape is preserved. No separate consent requirement is added by this contract.

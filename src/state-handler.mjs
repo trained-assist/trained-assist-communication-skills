@@ -7,7 +7,7 @@ import { renderStatePrompt } from './state-prompt.mjs';
 import { TypedError, logEvent } from './typed-error.mjs';
 
 export const STATE_CONTRACT_VERSION = 'v1';
-export const STATE_PROMPT_VERSION = 'sp1';
+export const STATE_PROMPT_VERSION = 'sp2';
 export const STATE_LADDER_NAME = globalThis.process?.env?.LLM_LADDER_NAME || 'service:classify';
 export const STATE_MAX_ATTEMPTS = 2;
 export const STATE_MAX_INPUT_CHARS = 120000;
@@ -87,6 +87,10 @@ export function normalizeStateInput(raw) {
     problems.push('conversation_revision: если задан — непустая строка');
   }
 
+  if (raw.extraction_instructions !== undefined && typeof raw.extraction_instructions !== 'string') problems.push('extraction_instructions: expected string');
+  for (const key of ['partner_profile', 'sender_profile', 'context', 'communication_plan']) {
+    if (raw[key] !== undefined && raw[key] !== null && typeof raw[key] !== 'string' && !isPlainObject(raw[key])) problems.push(`${key}: expected string or object`);
+  }
   if (problems.length) {
     throw new TypedError('VALIDATION_ERROR', `вход не проходит контракт extract_conversation_state ${STATE_CONTRACT_VERSION}`, { problems });
   }
@@ -99,11 +103,13 @@ export function stateInputMetrics(input) {
     ? history.messages.reduce((sum, m) => sum + sizeOf(m.text), 0)
     : sizeOf(history.text);
   const schemaChars = sizeOf(input.state_schema);
+  const contextChars = [input.partner_profile, input.sender_profile, input.context, input.communication_plan, input.extraction_instructions].reduce((sum, value) => sum + sizeOf(value), 0);
   return {
     history_messages: history.format === 'messages' ? history.messages.length : 1,
     history_chars: historyChars,
     schema_chars: schemaChars,
-    total_chars: historyChars + schemaChars,
+    context_chars: contextChars,
+    total_chars: historyChars + schemaChars + contextChars,
     coverage: {
       history_full: true,
       truncated: false,

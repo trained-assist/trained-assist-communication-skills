@@ -7,7 +7,7 @@ import { renderGoalPrompt } from './goal-prompt.mjs';
 import { TypedError, logEvent } from './typed-error.mjs';
 
 export const GOAL_CONTRACT_VERSION = 'v1';
-export const GOAL_PROMPT_VERSION = 'gp2';
+export const GOAL_PROMPT_VERSION = 'gp3';
 export const GOAL_LADDER_NAME = globalThis.process?.env?.LLM_LADDER_NAME || 'service:classify';
 export const GOAL_MAX_ATTEMPTS = 2;
 export const GOAL_MAX_INPUT_CHARS = 120000;
@@ -27,8 +27,13 @@ export function normalizeGoalInput(raw) {
   if (!nonEmpty(raw.conversation_revision)) problems.push('conversation_revision: required non-empty revision for stale-result protection');
   if (raw.language !== undefined && !nonEmpty(raw.language)) problems.push('language: expected non-empty string when present');
   if (raw.model_profile !== undefined && raw.model_profile !== 'default') throw new TypedError('MODEL_PROFILE_NOT_ALLOWED', 'only model_profile=default is allowed', { allowlist: ['default'] });
+  if (raw.material_bindings !== undefined) {
+    if (!Array.isArray(raw.material_bindings) || raw.material_bindings.length > 100 || raw.material_bindings.some(b => !isObject(b) || !nonEmpty(b.stage_id) || Object.keys(b).some(k => k !== 'stage_id')) || new Set(raw.material_bindings?.map?.(b => b?.stage_id)).size !== raw.material_bindings.length) {
+      problems.push('material_bindings: expected unique stage_id objects (maximum 100)');
+    }
+  }
   if (problems.length) throw new TypedError('VALIDATION_ERROR', `input does not satisfy evaluate_next_goal ${GOAL_CONTRACT_VERSION}`, { problems });
-  const chars = JSON.stringify({ conversation_objective: raw.conversation_objective, conversation_state: raw.conversation_state }).length;
+  const chars = JSON.stringify({ conversation_objective: raw.conversation_objective, conversation_state: raw.conversation_state, material_bindings: raw.material_bindings }).length;
   if (chars > GOAL_MAX_INPUT_CHARS) throw new TypedError('INPUT_TOO_LARGE', `input exceeds ${GOAL_MAX_INPUT_CHARS} characters`, { input_chars: chars, limit_chars: GOAL_MAX_INPUT_CHARS });
   return raw;
 }
@@ -38,10 +43,11 @@ function resultError(err, requestId) {
   return { isError: true, data: { error: { code: 'INTERNAL', message: 'unexpected goal handler error' }, request_id: requestId } };
 }
 
-function successfulResult({ status, goal = null, reason = '', requestId, input, started, model = null, attempts = 0, usage = { source: 'none' } }) {
+function successfulResult({ status, goal = null, reason = '', requestId, input, started, model = null, attempts = 0, usage = { source: 'none' }, execution = null }) {
   const revision = input.conversation_revision;
   const data = {
     status,
+    ...(input.material_bindings ? { execution } : {}),
     requires_message: status === 'goal_ready',
     goal,
     reason,
@@ -64,7 +70,7 @@ export async function evaluateNextGoal(raw, env = {}) {
       return successfulResult({ status: 'do_not_contact', reason: 'contact ban in conversation_state', requestId, input, started });
     }
     const { messages } = renderGoalPrompt({ ...input, language: input.language || 'ru' });
-    const schema = buildGoalDecisionSchema();
+    const schema = buildGoalDecisionSchema(input.material_bindings ?? null);
     const rejected = [];
     for (let attempt = 1; attempt <= GOAL_MAX_ATTEMPTS; attempt += 1) {
       const callMessages = messages.slice();
@@ -76,7 +82,7 @@ export async function evaluateNextGoal(raw, env = {}) {
         if (e instanceof LadderError) throw new TypedError('LLM_UNAVAILABLE', `shared ladder ${GOAL_LADDER_NAME} unavailable: ${e.message}`, { attempts: attempt });
         throw e;
       }
-      const checked = validateGoalDecision(parseLooseJson(response.content));
+      const checked = validateGoalDecision(parseLooseJson(response.content), input.material_bindings ?? null);
       if (checked.ok) {
         return successfulResult({
           ...checked.value,

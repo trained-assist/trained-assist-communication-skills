@@ -87,3 +87,7 @@ Technical failures are typed errors, not successful empty state:
 | `LLM_UNAVAILABLE` | 503 | shared ladder unavailable |
 | `STATE_REJECTED` | 422 | model output invalid after retry |
 | `MODEL_OUTPUT_INVALID` | 502 | response could not be parsed as JSON |
+
+## Optional full profile/context inputs (#HH142 S0)
+
+`extraction_instructions` is a string. `partner_profile`, `sender_profile`, `context` and `communication_plan` may be strings or objects. They are passed in full and counted in the same explicit size budget; excess returns INPUT_TOO_LARGE. Profile facts must not be converted into conversational promises; plan milestones must not be treated as already achieved.

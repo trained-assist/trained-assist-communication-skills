@@ -115,6 +115,11 @@ const STATE_INPUT_SCHEMA = {
     trace_id: { type: 'string', description: 'Trace id; returned in diagnostics.' },
     conversation_revision: { type: 'string', description: 'Caller revision of the history. Echoed so stale extraction results can be discarded.' },
     conversation_history: INPUT_COMMON.conversation_history,
+    extraction_instructions: { type: 'string' },
+    partner_profile: { type: ['object', 'string'] },
+    sender_profile: { type: ['object', 'string'] },
+    context: { type: ['object', 'string'] },
+    communication_plan: { type: ['object', 'string'] },
     state_schema: {
       type: 'object',
       description: 'Small JSON Schema-like subset. Root object schema; supported keywords: type, properties, required, additionalProperties:false, items, enum, min/max string/array/number bounds, description.',
@@ -137,6 +142,7 @@ const GOAL_INPUT_SCHEMA = {
     conversation_revision: { type: 'string', description: 'Revision истории, обработанной state extractor; возвращается для stale-result guard.' },
     conversation_state: { type: 'object', description: 'Результат extract_conversation_state.' },
     language: { type: 'string' }, model_profile: { type: 'string' },
+    material_bindings: { type: 'array', maxItems: 100, items: { type: 'object', additionalProperties: false, required: ['stage_id'], properties: { stage_id: { type: 'string' } } } },
     conversation_objective: { type: 'string', description: 'Верхнеуровневая цель диалога, к которой должен вести следующий ход.' },
   }, required: ['conversation_revision', 'conversation_state', 'conversation_objective'],
 };
