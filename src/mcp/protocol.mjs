@@ -8,6 +8,8 @@
 // JSON-RPC reply (or `undefined` for a notification). No fetch, no fs, no env.
 
 import { buildIntentInputSchema, buildDecisionResultSchema } from '../intent-schema.mjs';
+import { buildStateResultSchema } from '../state-schema.mjs';
+import { buildGoalResultSchema } from '../goal-schema.mjs';
 
 export const SERVER_NAME = 'trained-assist-communication-skills';
 export const SERVER_VERSION = '0.3.0';
@@ -105,15 +107,52 @@ const INPUT_COMMON = {
   model_profile: { type: 'string', description: 'Только серверный allowlist (R8); произвольные модели/ключи не принимаются.' },
 };
 
+const STATE_INPUT_SCHEMA = {
+  type: 'object',
+  additionalProperties: true,
+  properties: {
+    request_id: { type: 'string', description: 'Correlation id; echoed in the response.' },
+    trace_id: { type: 'string', description: 'Trace id; returned in diagnostics.' },
+    conversation_revision: { type: 'string', description: 'Caller revision of the history. Echoed so stale extraction results can be discarded.' },
+    conversation_history: INPUT_COMMON.conversation_history,
+    state_schema: {
+      type: 'object',
+      description: 'Small JSON Schema-like subset. Root object schema; supported keywords: type, properties, required, additionalProperties:false, items, enum, min/max string/array/number bounds, description.',
+    },
+    options: {
+      type: 'object',
+      properties: {
+        language: { type: 'string', description: 'Language for textual labels inside state when the schema allows them.' },
+      },
+    },
+    model_profile: { type: 'string', description: 'Server allowlist only; concrete model/rung stays in the shared ladder.' },
+  },
+  required: ['conversation_history', 'state_schema'],
+};
+
+const GOAL_INPUT_SCHEMA = {
+  type: 'object', additionalProperties: true,
+  properties: {
+    request_id: { type: 'string' }, trace_id: { type: 'string' },
+    conversation_revision: { type: 'string', description: 'Revision истории, обработанной state extractor; возвращается для stale-result guard.' },
+    conversation_state: { type: 'object', description: 'Результат extract_conversation_state.' },
+    language: { type: 'string' }, model_profile: { type: 'string' },
+    conversation_objective: { type: 'string', description: 'Верхнеуровневая цель диалога, к которой должен вести следующий ход.' },
+  }, required: ['conversation_revision', 'conversation_state', 'conversation_objective'],
+};
+
 // The canonical tool (issue #6 §1). `evaluate_message_quality` is intentionally
 // NOT exposed over MCP any more: it existed so third-party generators could reuse
-// the guard, and with one tool in scope there is no such consumer. The guard is
+// the guard, and no external consumer needs a separate quality tool. The guard is
 // still applied internally on every draft — it is not lost, only unexposed.
 //
-// The second tool is `resolve_user_intent` (issue #10): it formulates the user's
-// goal and picks exactly one id from the caller's closed list. It shares this
-// conversation with the writer — same JSON-RPC, same doors — but NOT the same
-// handler: two methods, two handlers, one protocol (ADR-0001).
+// `extract_conversation_state` is the first step of epic #11's chain:
+// history -> state -> next goal -> message. It has its own handler, but shares
+// the same Worker doors and ladder discipline.
+//
+// `resolve_user_intent` (issue #10) formulates the user's goal and picks exactly
+// one id from the caller's closed list. Its public answer stays two fields even
+// while evaluate_next_goal independently formulates an open goal from state.
 export const TOOLS = [
   {
     name: 'generate_next_message_to_conversation_partner',
@@ -123,6 +162,18 @@ export const TOOLS = [
       properties: INPUT_COMMON,
       required: ['goal', 'communication_style', 'language', 'conversation_history'],
     },
+  },
+  {
+    name: 'extract_conversation_state',
+    description: 'Extract a structured conversation state from the full history using a caller-provided small JSON Schema-like state_schema. Does not choose the next goal, write, or send a message.',
+    inputSchema: STATE_INPUT_SCHEMA,
+    outputSchema: buildStateResultSchema({ type: 'object', additionalProperties: false, properties: {} }),
+  },
+  {
+    name: 'evaluate_next_goal',
+    description: 'Formulate an open-ended next communication goal from the conversation objective and extracted state. Returns wait/no_matching_option/contact-ban outcomes without a writer goal.',
+    inputSchema: GOAL_INPUT_SCHEMA,
+    outputSchema: buildGoalResultSchema(),
   },
   {
     name: 'resolve_user_intent',

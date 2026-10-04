@@ -1,6 +1,6 @@
 # Communication MCP — ТЗ общего генератора следующего сообщения
 
-> **Второй метод.** Рядом с этим контрактом живёт `resolve_user_intent` — определение цели пользователя и выбор ровно одного варианта из переданного списка (issue #10). У него свой контракт: [docs/resolve-user-intent-contract.md](resolve-user-intent-contract.md). Общее у методов — рантайм, протокол и запрет на собственную лестницу (ADR-0001); логики они не делят.
+> **Соседние методы.** Рядом с writer-контрактом живут `extract_conversation_state` (epic #11, [docs/extract-conversation-state-contract.md](extract-conversation-state-contract.md)), `evaluate_next_goal` (epic #11, [docs/evaluate-next-goal-contract.md](evaluate-next-goal-contract.md)) и `resolve_user_intent` (issue #10, [docs/resolve-user-intent-contract.md](resolve-user-intent-contract.md)). Общее у методов — рантайм, протокол, запрет на собственную лестницу (ADR-0001) и небольшие внутренние примитивы без публичного влияния на контракты.
 >
 > **Статус реализации (03.10.2026):** рантайм перенесён на Cloudflare Worker (VM выводится из эксплуатации), добавлено обязательное состояние диалога и расширенный guard. Подробнее — [README.md](../README.md) и [docs/requirements-log.md](requirements-log.md). Ниже — исходный контракт v1 с пометками о том, что изменилось.
 
@@ -101,6 +101,8 @@ VM на GCP выводится из эксплуатации (agent#2053, реш
 | `GET /health` | публичный; `not_configured`, если нет ladder-конфига |
 | `POST /mcp` | MCP streamable HTTP |
 | `POST /v1/dialogs/next-message` | тот же handler по REST |
+| `POST /v1/conversations/state/extract` | state extractor по REST |
+| `POST /v1/conversations/next-goal` | next-goal selector по REST |
 
 Stateless: нет D1/Vectorize/AI-биндинга. Состояние диалога выводится из переданной истории каждый раз.
 

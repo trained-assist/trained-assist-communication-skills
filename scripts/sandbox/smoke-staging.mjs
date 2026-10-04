@@ -83,10 +83,10 @@ async function main() {
   check('writer вернул черновик', typeof writerBody.message_text === 'string' && writerBody.message_text.length > 0,
     `message_text=${JSON.stringify(writerBody.message_text).slice(0, 70)}`);
 
-  // 5. MCP-дверь — оба инструмента в tools/list.
+  // 5. MCP-дверь — канонические инструменты в tools/list.
   const list = await post('/mcp', { jsonrpc: '2.0', id: 1, method: 'tools/list' });
   const names = (list.json?.result?.tools || []).map((t) => t.name);
-  check('MCP tools/list → оба инструмента', names.includes('generate_next_message_to_conversation_partner') && names.includes('resolve_user_intent'),
+  check('MCP tools/list → канонические инструменты', names.includes('generate_next_message_to_conversation_partner') && names.includes('extract_conversation_state') && names.includes('evaluate_next_goal') && names.includes('resolve_user_intent'),
     `tools=${JSON.stringify(names)}`);
 
   const failed = checks.filter((c) => !c.ok);

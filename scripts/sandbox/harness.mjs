@@ -426,11 +426,13 @@ async function main() {
       const init = await client.request('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'sandbox-harness', version: '0.0.0' } });
       const listed = await client.request('tools/list', {});
       const names = (listed.result?.tools || []).map((t) => t.name);
-      const handshakeOk = record('сценарий', 'S1-mcp-handshake — initialize + tools/list отдаёт оба канонических инструмента со схемами',
+      const handshakeOk = record('сценарий', 'S1-mcp-handshake — initialize + tools/list отдаёт канонические инструменты со схемами',
         init.result?.serverInfo?.name === 'trained-assist-communication-skills'
         && names.includes('generate_next_message_to_conversation_partner')
+        && names.includes('extract_conversation_state')
+        && names.includes('evaluate_next_goal')
         && names.includes('resolve_user_intent')
-        && names.length === 2
+        && names.length === 4
         && (listed.result?.tools || []).every((t) => t.inputSchema && t.description),
         `serverInfo=${JSON.stringify(init.result?.serverInfo)}, tools=${JSON.stringify(names)}`);
       client.notify('notifications/initialized', {});

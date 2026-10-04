@@ -179,7 +179,7 @@
   "scenarios": [
     {
       "id": "S1-mcp-handshake",
-      "title": "MCP handshake: initialize → tools/list содержит оба канонических инструмента",
+      "title": "MCP handshake: initialize → tools/list содержит канонические инструменты",
       "tool": null,
       "expect": { "kind": "handshake" }
     },
