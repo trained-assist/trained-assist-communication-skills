@@ -38,7 +38,7 @@ export async function ladderChat({
   temperature = 0.7,
   maxTokens = 800,
   timeoutMs = 60000,
-  totalTimeoutMs = 90000,
+  totalTimeoutMs = 120000,
   app = 'communication-skills',
   responseFormat = null,
   traceId = null,
@@ -53,8 +53,9 @@ export async function ladderChat({
     messages,
     temperature,
     max_tokens: maxTokens,
-    // Full state extraction can take 38s on the configured rung. A 20s rung
-    // limit discarded that work twice; give it the remaining method deadline.
+    // A single provider rung remains capped at 60s by the shared ladder. Give the
+    // whole method a larger budget so it can traverse slow fallbacks and validate
+    // or repair the result without discarding a late successful answer.
     ladder_timeout_ms: Math.min(timeoutMs, totalTimeoutMs),
     ladder_total_timeout_ms: totalTimeoutMs,
   };
