@@ -41,6 +41,7 @@ export async function ladderChat({
   totalTimeoutMs = 60000,
   app = 'communication-skills',
   responseFormat = null,
+  reasoningEffort = null,
   traceId = null,
 } = {}) {
   if (!Number.isFinite(totalTimeoutMs) || totalTimeoutMs <= 0) throw new LadderError('ladderChat: invalid total timeout budget');
@@ -59,6 +60,10 @@ export async function ladderChat({
     ladder_total_timeout_ms: totalTimeoutMs,
   };
   if (responseFormat) body.response_format = responseFormat;
+  if (reasoningEffort !== null) {
+    if (!['low', 'medium', 'high'].includes(reasoningEffort)) throw new LadderError('ladderChat: invalid reasoning effort');
+    body.reasoning_effort = reasoningEffort;
+  }
 
   let res;
   try {

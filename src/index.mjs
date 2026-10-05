@@ -80,6 +80,7 @@ function serveHealth(env) {
     status: configured ? 'ready' : 'not_configured',
     service: SERVER_NAME,
     version: SERVER_VERSION,
+    build: env.BUILD_SHA || null,
     contract_version: CONTRACT_VERSION,
     prompt_version: PROMPT_VERSION,
     ladder_configured: configured,
