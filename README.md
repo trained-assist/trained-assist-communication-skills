@@ -1,5 +1,8 @@
 # trained-assist-communication-skills
 
+**GCP VM exit (05.10.2026):** New work on `alesa-personal-assistent/us-central1-a/alesa-vm` is prohibited. Use serverless by default; the existing French VM only for a proven persistent or local requirement. Other Google services remain allowed. See [the exit plan](https://github.com/trained-assist/trained-agent-architecture/issues/145).
+
+
 Общий state-first контур для диалогов: извлечение состояния, формулирование следующей открытой цели и генерация сообщения. Отдельный resolver выбирает из закрытого списка там, где этого требует вызывающая сторона. Первый потребитель — рекрутинг; далее sales и другие домены.
 
 **Рантайм: Cloudflare Worker** (VM на GCP выводится из эксплуатации — agent#2053, решение владельца 03.10.2026). Методы не зависят от VM: ни файлов, ни процессов, ни локальных секретов. Модель — через общий `trained-assist-llm-ladder`, который сам является Worker'ом, поэтому путь запроса Worker→Worker.
