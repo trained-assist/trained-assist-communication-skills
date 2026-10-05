@@ -15,6 +15,7 @@
     "gate": "npm run check && npm test && npm run sandbox"
   },
   "devDependencies": {
+    "ajv": "^8.20.0",
     "wrangler": "^4.86.0"
   },
   "engines": {
