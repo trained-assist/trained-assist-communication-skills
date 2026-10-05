@@ -16,7 +16,7 @@ async function mockLadder(answer, callback) {
 }
 test('verbatim execution is an explicit reference, free goal is preserved', async () => {
  const r = await mockLadder({status:'goal_ready',goal,execution:{type:'send_material',stage_id:'stage-xyz'}}, body => {
-  assert.deepEqual(body.response_format.json_schema.schema.properties.execution.properties.stage_id.enum,['stage-xyz']);
+  assert.deepEqual(body.response_format.json_schema.schema.properties.execution.anyOf.find(variant => variant.properties?.type?.enum?.includes('send_material')).properties.stage_id.enum,['stage-xyz']);
   assert.match(body.messages.at(-1).content,/stage-xyz/);
  });
  assert.equal(r.isError,false); assert.equal(r.data.goal.instruction,goal.instruction);
