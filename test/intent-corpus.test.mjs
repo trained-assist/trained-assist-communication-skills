@@ -30,7 +30,8 @@ test('корпус: все кейсы зелёные на контракте (о
     console.log(`  ✗ ${r.id} — ${r.title}\n      → ${r.problems.join(' · ')}`);
   }
   assert.equal(failed.length, 0, `${failed.length} кейсов красные`);
-  assert.ok(metrics.cases >= 75, `кейсов ${metrics.cases}, ожидалось не меньше 75`);
+  // 75 кейсов исходного корпуса + 25 кейсов на каталоге control plane (integration-v1).
+  assert.ok(metrics.cases >= 100, `кейсов ${metrics.cases}, ожидалось не меньше 100`);
 });
 
 test('корпус: кейсы сжатия есть и проверяют промпт, а не только ответ', async () => {
@@ -44,10 +45,38 @@ test('корпус: кейсы сжатия есть и проверяют пр�
   assert.equal(needle[0].problems.length, 0, needle[0].problems.join(' · '));
 });
 
-test('корпус: пять разных каталогов решений, а не один', async () => {
+test('корпус: шесть разных каталогов решений, а не один', async () => {
   const { results } = await runCorpus({ mode: 'offline' });
   const catalogs = new Set(results.map((r) => r.catalog));
-  assert.deepEqual([...catalogs].sort(), ['ops', 'sales', 'single', 'support', 'trained-assist']);
+  // integration-v1 — зеркало того каталога, который реально отправляет control plane
+  // (PR #43). Список приходит от вызывающей стороны, поэтому корпус обязан
+  // проверяться и на нём: тот же метод, другой закрытый список, другой enum ответа.
+  assert.deepEqual([...catalogs].sort(), ['integration-v1', 'ops', 'sales', 'single', 'support', 'trained-assist']);
+});
+
+test('корпус: на каталоге control plane есть ложно-быстрые, продолжения, отрицания, вложения и quoted-инструкции', async () => {
+  const { results } = await runCorpus({ mode: 'offline' });
+  const ids = results.filter((r) => r.catalog === 'integration-v1').map((r) => r.id);
+  // Смешанный запрос обязан быть agent, а не quick answer: это главный риск формы
+  // «вопрос о возможностях + действие», где быстрый ответ тихо теряет задачу.
+  for (const id of ['V06-mixed-capability-plus-task', 'V07-mixed-health-plus-action', 'V08-mixed-capability-plus-file']) {
+    assert.ok(ids.includes(id), `нет кейса ${id}`);
+    const r = results.find((x) => x.id === id);
+    assert.equal(r.decision, 'agent', `${id} выбрал ${r.decision} — задача потеряна за быстрым ответом`);
+  }
+  // Восемь требуемых групп покрыты, а не объявлены: каждая имеет метку и кейс.
+  for (const group of [
+    'V01-work-paraphrase-alive', 'V04-capability-paraphrase-what-can',
+    'V09-continue-active-task', 'V10-continue-by-months', 'V11-do-the-same',
+    'V12-look-but-do-not-change', 'V13-do-not-send',
+    'V15-attachment-metadata-only', 'V16-unreadable-document-link',
+    'V17-capability-not-connected', 'V18-missing-required-input',
+    'V21-quoted-instruction-is-data', 'V22-quoted-instruction-cp-no-origin', 'V23-ambiguous-continuation-no-context',
+    'V24-long-input-condition-in-middle',
+  ]) {
+    assert.ok(ids.includes(group), `группа корпуса не покрыта: нет кейса ${group}`);
+    assert.equal(results.find((x) => x.id === group).problems.length, 0, `${group} красный`);
+  }
 });
 
 test('корпус: ноль потерянных размеченных ограничений и подзадач', async () => {

@@ -6,7 +6,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { runIntentGuard, confirmedEvidence, normalizeGoal } from '../src/intent-guard.mjs';
+import { runIntentGuard, confirmedEvidence, normalizeGoal, assertsUnreadContent } from '../src/intent-guard.mjs';
 import { NO_MATCHING_OPTION } from '../src/intent-schema.mjs';
 
 const ALLOWED = ['quick_llm_reply', 'start_opencode', NO_MATCHING_OPTION];
@@ -116,6 +116,79 @@ test('легитимная цель про файл без его содержи
 test('no_matching_option — нормальный ответ, а не ошибка guard\'а', () => {
   const g = runIntentGuard({ input: input(), output: { user_goal: 'Остановить текущую задачу', decision: NO_MATCHING_OPTION }, allowedIds: ALLOWED });
   assert.equal(g.verdict, 'ok');
+});
+
+test('цель активной задачи — подтверждённый источник: продолжение не отклоняется как выдумка', () => {
+  // Дефект, воспроизведённый на живой форме control plane: active_tasks отрисовываются
+  // промптом дословно, но в confirmedEvidence их не было. «Продолжай» после задачи с
+  // датой в цели давало INTENT_REJECTED и два оплаченных вызова лестницы.
+  const withTask = input({
+    dialog_context: { history: [], active_tasks: [{ id: 'ut-1', goal: 'Подготовить отчёт по продажам за 09.2025' }] },
+  });
+  assert.ok(confirmedEvidence(withTask).includes('09.2025'), 'цель активной задачи не попала в подтверждённые источники');
+  const g = runIntentGuard({
+    input: withTask,
+    output: { user_goal: 'Продолжить подготовку отчёта по продажам за 09.2025', decision: 'start_opencode' },
+    allowedIds: ALLOWED,
+  });
+  assert.equal(g.verdict, 'ok', g.reasons.join('; '));
+});
+
+test('ожидаемый ответ активной задачи тоже подтверждённый источник', () => {
+  const withTask = input({ dialog_context: { active_tasks: [{ id: 'ut-1', goal: 'Собрать сводку', expected_answer: 'таблица за 03.2026' }] } });
+  assert.ok(confirmedEvidence(withTask).includes('03.2026'));
+});
+
+test('утверждение, что содержимое НЕ передано, не считается выдумкой', () => {
+  // Промпт прямо требует сказать «прочитать нечего», а вложения от CP приходят всегда
+  // без текста. Раньше такая формулировка отклонялась как unavailable_source.
+  const honest = [
+    ['Ответить, что в документе прочитать нечего: передан только манифест, содержимое не извлечено', 'в документе'],
+    ['Ответить, что в файле нет текста: доступен только манифест', 'в файле'],
+    ['Сказать, что в приложении нечего разбирать', 'в приложении'],
+  ];
+  for (const [goal, claim] of honest) {
+    assert.equal(assertsUnreadContent(goal, claim), false, `отвергнута честная формулировка: ${goal}`);
+  }
+});
+
+test('выдумка о содержимом не проходит ни через оговорку, ни через повтор, ни через догадку', () => {
+  const cases = [
+    ['Ответить, что в документе указано 50 сделок, но прочитать не удалось', 'в документе'],
+    ['Ответить, что в документе нечего прочитать, но, вероятно, там релокация', 'в документе'],
+    ['Перевести файл: в файле ничего нет, а в файле указано, что опыт 5 лет', 'в файле'],
+  ];
+  for (const [goal, claim] of cases) {
+    assert.equal(assertsUnreadContent(goal, claim), true, `выдумка прошла: ${goal}`);
+  }
+  // Повторная проверка целиком: guard отклоняет, а не пропускает.
+  const g = runIntentGuard({
+    input: input({
+      input_bundle: {
+        id: 'b-1', version: 'v1',
+        events: [{ id: 'e1', type: 'text', author: 'user', text: 'Переведи резюме' }],
+        attachments: [{ id: 'a1', name: 'resume.pdf', content_status: 'metadata_only' }],
+      },
+    }),
+    output: { user_goal: 'Ответить, что в документе указано 50 сделок, но прочитать не удалось', decision: 'start_opencode' },
+    allowedIds: ALLOWED,
+  });
+  assert.equal(g.verdict, 'unavailable_source');
+});
+
+test('прочитанное вложение не считается непрочитанным даже при похожей формулировке', () => {
+  const g = runIntentGuard({
+    input: input({
+      input_bundle: {
+        id: 'b-1', version: 'v1',
+        events: [{ id: 'e1', type: 'text', author: 'user', text: 'Переведи резюме' }],
+        attachments: [{ id: 'a1', name: 'resume.pdf', content_status: 'text_available', text: 'Опыт: 5 лет, логист' }],
+      },
+    }),
+    output: { user_goal: 'Перевести приложенный файл резюме на английский язык', decision: 'start_opencode' },
+    allowedIds: ALLOWED,
+  });
+  assert.equal(g.verdict, 'ok', g.reasons.join('; '));
 });
 
 test('confirmedEvidence собирает только подтверждённые источники', () => {
