@@ -116,6 +116,7 @@ const STATE_INPUT_SCHEMA = {
     conversation_revision: { type: 'string', description: 'Caller revision of the history. Echoed so stale extraction results can be discarded.' },
     conversation_history: INPUT_COMMON.conversation_history,
     extraction_instructions: { type: 'string' },
+    evidence_source_refs: { type: 'object', additionalProperties: { type: 'string' }, description: 'Optional source ID to JSON pointer mapping into supplied input. Enables exact quote provenance checks and repair without duplicating source text.' },
     partner_profile: { type: ['object', 'string'] },
     sender_profile: { type: ['object', 'string'] },
     context: { type: ['object', 'string'] },
