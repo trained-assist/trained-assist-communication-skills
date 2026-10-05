@@ -1,6 +1,6 @@
 'use strict';
 
-// JSON Schema and validators for the compose_next_message_in_one_call answer (issue #28).
+// JSON Schema and validators for the next_message_in_dialogue answer (issue #28).
 //
 // One ladder call returns three things at once: what happened (key_facts), what
 // the next step is (next_goal) and the message text. The shape is deliberately

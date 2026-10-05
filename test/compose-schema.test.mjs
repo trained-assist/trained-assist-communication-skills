@@ -1,6 +1,6 @@
 'use strict';
 
-// compose_next_message_in_one_call: форма ответа и проверка evidence (issue #28).
+// next_message_in_dialogue: форма ответа и проверка evidence (issue #28).
 //
 // Evidence — это единственное, что потребитель не может перепроверить, не
 // перечитав диалог: он видит цитату и обязан ей верить. Поэтому проверка

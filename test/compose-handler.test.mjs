@@ -1,6 +1,6 @@
 'use strict';
 
-// compose_next_message_in_one_call: handler (issue #28).
+// next_message_in_dialogue: handler (issue #28).
 //
 // Три вещи, которые здесь проверяются как факт, а не как намерение:
 //   1. успешный путь — РОВНО один вызов лестницы (иначе метод не то, чем

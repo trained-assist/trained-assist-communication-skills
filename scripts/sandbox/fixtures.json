@@ -208,7 +208,7 @@
     {
       "id": "S2-generate-first-contact",
       "title": "Первый контакт: пустая история → status=generated, непустой черновик",
-      "tool": "generate_next_message_to_conversation_partner",
+      "tool": "next_message_in_dialogue_from_goal",
       "arguments": {
         "goal": { "instruction": "Поздоровайтесь и представьтесь, назовите компанию и спросите про опыт работы с CRM-системами. Не задавайте больше двух вопросов." },
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», короткие абзацы, без канцелярита, без восклицательных знаков." },
@@ -233,7 +233,7 @@
     {
       "id": "S3-guard-retry",
       "title": "Guard после генерации: первый draft отклонён, второй принят — ровно 2 вызова лестницы",
-      "tool": "generate_next_message_to_conversation_partner",
+      "tool": "next_message_in_dialogue_from_goal",
       "arguments": {
         "goal": { "instruction": "Уточните один конкретный пробел в опыте кандидата и попросите привести один пример из практики." },
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», спокойно и без канцелярита." },
@@ -255,7 +255,7 @@
     {
       "id": "S4-retry-budget-ceiling",
       "title": "Общий retry budget не перемножается: guard не пропускает → ровно 2 вызова лестницы, типизированная ошибка",
-      "tool": "generate_next_message_to_conversation_partner",
+      "tool": "next_message_in_dialogue_from_goal",
       "arguments": {
         "goal": { "instruction": "Дайте краткий ответ из трёх строк о вашем опыте." },
         "communication_style": { "instructions": "Ты — рекрутер NexTouch, отвечай коротко." },
@@ -270,7 +270,7 @@
     {
       "id": "S5-needs-context",
       "title": "Нет подтверждённого факта → status=needs_context + missing_fields, ничего не выдумано",
-      "tool": "generate_next_message_to_conversation_partner",
+      "tool": "next_message_in_dialogue_from_goal",
       "arguments": {
         "goal": {
           "instruction": "Расскажите про любые открытые вакансии, на которые вы сейчас откликаетесь, и назовите их точные названия.",
@@ -290,7 +290,7 @@
     {
       "id": "S6-no-contact-requested",
       "title": "Запрет контакта → no_message_needed, лестница НЕ вызывается (issue #6 R2)",
-      "tool": "generate_next_message_to_conversation_partner",
+      "tool": "next_message_in_dialogue_from_goal",
       "arguments": {
         "goal": { "instruction": "Выясните, можно ли ещё писать кандидату, и если да — предложите вакансию." },
         "communication_style": { "instructions": "Ты — рекрутер NexTouch, вежливо и кратко." },
@@ -311,7 +311,7 @@
     {
       "id": "S7-answered-question-not-repeated",
       "title": "Отвеченный вопрос не переспрашивается; в prompt есть состояние диалога (issue #6 R1)",
-      "tool": "generate_next_message_to_conversation_partner",
+      "tool": "next_message_in_dialogue_from_goal",
       "arguments": {
         "goal": { "instruction": "Уточните формат работы и предложите созвон." },
         "communication_style": { "instructions": "Ты — рекрутер NexTouch, спокойно и без канцелярита." },
@@ -333,7 +333,7 @@
     {
       "id": "S8-input-too-large",
       "title": "Вход не влезает → типизированный INPUT_TOO_LARGE с размерами, без молчаливого slice",
-      "tool": "generate_next_message_to_conversation_partner",
+      "tool": "next_message_in_dialogue_from_goal",
       "arguments": {
         "goal": { "instruction": "Ответьте по вакансии." },
         "communication_style": { "instructions": "Ты — рекрутер NexTouch." },
@@ -353,7 +353,7 @@
     {
       "id": "S9-ladder-api-failure",
       "title": "Ошибка лестницы → isError с типизированным кодом, НЕ пустой успешный ответ",
-      "tool": "generate_next_message_to_conversation_partner",
+      "tool": "next_message_in_dialogue_from_goal",
       "arguments": {
         "goal": { "instruction": "Сгенерируйте одно сообщение с приветствием и одним вопросом о зарплатных ожиданиях." },
         "communication_style": { "instructions": "Ты — рекрутер NexTouch." },
@@ -368,7 +368,7 @@
     {
       "id": "S10-ambiguous-roles",
       "title": "Неразмеченный текст с неясными ролями → needs_context/validation, роли НЕ выдуманы, лестница НЕ вызывается",
-      "tool": "generate_next_message_to_conversation_partner",
+      "tool": "next_message_in_dialogue_from_goal",
       "arguments": {
         "goal": { "instruction": "Ответьте по последнему сообщению собеседника." },
         "communication_style": { "instructions": "Ты — рекрутер NexTouch." },
@@ -682,7 +682,7 @@
     {
       "id": "C1-compose-ready",
       "title": "Один вызов: состояние + цель + сообщение, ровно 1 вызов лестницы",
-      "tool": "compose_next_message_in_one_call",
+      "tool": "next_message_in_dialogue",
       "arguments": {
         "conversation_objective": "Квалифицировать опыт кандидата с CRM",
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
@@ -715,7 +715,7 @@
     {
       "id": "C2-compose-wait",
       "title": "wait: текста для отправки нет, лестница вызвана один раз",
-      "tool": "compose_next_message_in_one_call",
+      "tool": "next_message_in_dialogue",
       "arguments": {
         "conversation_objective": "Квалифицировать опыт кандидата с CRM",
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
@@ -745,7 +745,7 @@
     {
       "id": "C3-compose-guard-repair",
       "title": "Переспрос решённого вопроса отклоняется: 2 вызова, второй принят",
-      "tool": "compose_next_message_in_one_call",
+      "tool": "next_message_in_dialogue",
       "arguments": {
         "conversation_objective": "Квалифицировать опыт кандидата с CRM",
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
@@ -775,7 +775,7 @@
     {
       "id": "C4-compose-evidence-repair",
       "title": "Выдуманная цитата отклоняется валидатором evidence: 2 вызова",
-      "tool": "compose_next_message_in_one_call",
+      "tool": "next_message_in_dialogue",
       "arguments": {
         "conversation_objective": "Квалифицировать опыт кандидата с CRM",
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
@@ -804,7 +804,7 @@
     {
       "id": "C5-compose-json-repair",
       "title": "Невалидный JSON → ремонт с причиной, ровно 2 вызова",
-      "tool": "compose_next_message_in_one_call",
+      "tool": "next_message_in_dialogue",
       "arguments": {
         "conversation_objective": "Квалифицировать опыт кандидата с CRM",
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
@@ -833,7 +833,7 @@
     {
       "id": "C6-compose-fallback-chain",
       "title": "Обе попытки невалидны → существующая цепочка: 5 вызовов, ответ writer'а",
-      "tool": "compose_next_message_in_one_call",
+      "tool": "next_message_in_dialogue",
       "arguments": {
         "conversation_objective": "Квалифицировать опыт кандидата с CRM",
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
@@ -863,7 +863,7 @@
     {
       "id": "C7-compose-fallback-wait",
       "title": "Цепочка остановилась на этапе цели → wait без текста, 4 вызова",
-      "tool": "compose_next_message_in_one_call",
+      "tool": "next_message_in_dialogue",
       "arguments": {
         "conversation_objective": "Квалифицировать опыт кандидата с CRM",
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
@@ -893,7 +893,7 @@
     {
       "id": "C8-compose-do-not-contact",
       "title": "Запрет контакта: do_not_contact, лестница НЕ вызывается",
-      "tool": "compose_next_message_in_one_call",
+      "tool": "next_message_in_dialogue",
       "arguments": {
         "conversation_objective": "Квалифицировать опыт кандидата с CRM",
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },

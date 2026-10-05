@@ -206,7 +206,7 @@ function evaluateExpectations(exp, data, isError, calls, text = '', prompts = []
     problems.push(`isError=${isError}, ожидалось ${exp.is_error}`);
   }
 
-  // resolve_user_intent отдаёт ровно два поля; compose_next_message_in_one_call прячет текст
+  // resolve_user_intent отдаёт ровно два поля; next_message_in_dialogue прячет текст
   // в message.text. Обе формы должны проверяться одинаково, иначе «черновик
   // пуст» для compose стал бы невыразимым.
   const messageText = data && (data.message_text ?? data.message?.text ?? (data.result && data.result.message_text));
@@ -250,7 +250,7 @@ function evaluateExpectations(exp, data, isError, calls, text = '', prompts = []
     }
   }
   if (exp.kind === 'compose') {
-    // Публичный ответ — пять полей контракта compose_next_message_in_one_call. Их ровно
+    // Публичный ответ — пять полей контракта next_message_in_dialogue. Их ровно
     // пять, и шестое поле означало бы, что метод подмевает диагностику в тело.
     if (exp.exact_fields) {
       const keys = Object.keys(data || {}).sort();
@@ -459,11 +459,11 @@ async function main() {
       const names = (listed.result?.tools || []).map((t) => t.name);
       const handshakeOk = record('сценарий', 'S1-mcp-handshake — initialize + tools/list отдаёт канонические инструменты со схемами',
         init.result?.serverInfo?.name === 'trained-assist-communication-skills'
-        && names.includes('generate_next_message_to_conversation_partner')
+        && names.includes('next_message_in_dialogue_from_goal')
         && names.includes('extract_conversation_state')
         && names.includes('evaluate_next_goal')
         && names.includes('resolve_user_intent')
-        && names.includes('compose_next_message_in_one_call')
+        && names.includes('next_message_in_dialogue')
         && names.length === 5
         && (listed.result?.tools || []).every((t) => t.inputSchema && t.description),
         `serverInfo=${JSON.stringify(init.result?.serverInfo)}, tools=${JSON.stringify(names)}`);

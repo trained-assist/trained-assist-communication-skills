@@ -1,6 +1,6 @@
 'use strict';
 
-// Deterministic prompt renderer for compose_next_message_in_one_call (issue #28).
+// Deterministic prompt renderer for next_message_in_dialogue (issue #28).
 //
 // ONE ladder call has to do the work of the whole state → goal → message chain,
 // so the prompt carries everything the three separate prompts carried: the
@@ -41,7 +41,7 @@ function renderProfile(value, fallback) {
 }
 
 /**
- * @param {object} input normalised compose_next_message_in_one_call input
+ * @param {object} input normalised next_message_in_dialogue input
  * @returns {{messages: Array<{role:string,content:string}>, language:string}}
  */
 export function renderComposePrompt(input) {

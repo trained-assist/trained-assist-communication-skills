@@ -163,7 +163,7 @@ export default {
       });
     }
 
-    // ── REST door: compose_next_message_in_one_call (issue #28) ──────────────────────────
+    // ── REST door: next_message_in_dialogue (issue #28) ──────────────────────────
     // The one-call alternative to the chain. The contract version in the header
     // tells the caller which path actually produced the answer: a fallback
     // result IS the writer's result, and labelling it as composed would be a lie.

@@ -4,11 +4,11 @@
 
 **Рантайм: Cloudflare Worker** (VM на GCP выводится из эксплуатации — agent#2053, решение владельца 03.10.2026). Методы не зависят от VM: ни файлов, ни процессов, ни локальных секретов. Модель — через общий `trained-assist-llm-ladder`, который сам является Worker'ом, поэтому путь запроса Worker→Worker.
 
-Контракты: [docs/spec.md](docs/spec.md) (writer) · [docs/extract-conversation-state-contract.md](docs/extract-conversation-state-contract.md) (state) · [docs/evaluate-next-goal-contract.md](docs/evaluate-next-goal-contract.md) (goal) · [docs/compose-next-message-in-one-call-contract.md](docs/compose-next-message-in-one-call-contract.md) (compose) · [docs/resolve-user-intent-contract.md](docs/resolve-user-intent-contract.md) (resolver) · ТЗ: [#6](https://github.com/trained-assist/trained-assist-communication-skills/issues/6), [#10](https://github.com/trained-assist/trained-assist-communication-skills/issues/10), [#28](https://github.com/trained-assist/trained-assist-communication-skills/issues/28) и эпик #11
+Контракты: [docs/spec.md](docs/spec.md) (writer) · [docs/extract-conversation-state-contract.md](docs/extract-conversation-state-contract.md) (state) · [docs/evaluate-next-goal-contract.md](docs/evaluate-next-goal-contract.md) (goal) · [docs/next-message-in-dialogue-contract.md](docs/next-message-in-dialogue-contract.md) (compose) · [docs/resolve-user-intent-contract.md](docs/resolve-user-intent-contract.md) (resolver) · ТЗ: [#6](https://github.com/trained-assist/trained-assist-communication-skills/issues/6), [#10](https://github.com/trained-assist/trained-assist-communication-skills/issues/10), [#28](https://github.com/trained-assist/trained-assist-communication-skills/issues/28) и эпик #11
 
 ## Инструменты MCP
 
-### `generate_next_message_to_conversation_partner` (contract v1)
+### `next_message_in_dialogue_from_goal` (contract v1)
 
 Пишет ОДНО следующее сообщение по явно заданной цели. Не выбирает шаг процесса, не отправляет. Возвращает черновик.
 
@@ -36,7 +36,7 @@
 - Ревизия диалога возвращается в ответе для отбрасывания устаревшего результата.
 - `resolve_user_intent` остаётся отдельным методом для задач, где вызывающая сторона действительно передаёт закрытый список решений.
 
-### `compose_next_message_in_one_call` (contract v1, issue #28)
+### `next_message_in_dialogue` (contract v1, issue #28)
 
 Один вызов вместо цепочки: возвращает состояние (`key_facts` с дословными цитатами), цель следующего
 шага и текст сообщения. Эксперимент рядом с цепочкой, а не её замена: цепочка остаётся эталоном и
@@ -96,7 +96,7 @@ npm run dev           # wrangler dev на :8787
 
 Размеченный корпус resolver'а (`scripts/corpus/cases.json`, 72 кейса на пяти разных каталогах решений) прогоняется в двух режимах. Офлайн-лестница подменена скриптом: это проверяет контракт, самосогласованность меток и то, что guard ловит поданные ему дефекты — но **не** доказывает, что модель выбирает правильно. Замер качества — только `corpus:live`, и раннер печатает это предупреждение сам.
 
-Бенчмарк `compose_next_message_in_one_call` против цепочки (`scripts/benchmark/`, 12 синтетических диалогов) устроен так же: офлайн считает конвейер и число вызовов, живой прогон — p50/p95, токены, стоимость, долю успеха с первой попытки и долю fallback. Отчёт — [scripts/benchmark/report.md](scripts/benchmark/report.md), и он сам перечисляет, чего не измеряет.
+Бенчмарк `next_message_in_dialogue` против цепочки (`scripts/benchmark/`, 12 синтетических диалогов) устроен так же: офлайн считает конвейер и число вызовов, живой прогон — p50/p95, токены, стоимость, долю успеха с первой попытки и долю fallback. Отчёт — [scripts/benchmark/report.md](scripts/benchmark/report.md), и он сам перечисляет, чего не измеряет.
 
 ## Границы
 
@@ -146,7 +146,7 @@ npm run dev           # wrangler dev на :8787
 - [x] Epic #11 S0/S1: ADR state-first цепочки и MVP `extract_conversation_state`
 - [x] Epic #11: `evaluate_next_goal` формулирует открытую цель по objective + state; terminal outcomes останавливают цепочку до writer
 - [x] Сжатие длинного ввода: первое + последнее предложение + релевантное из середины, без LLM
-- [x] `compose_next_message_in_one_call` (issue #28): один вызов вместо цепочки, дословный evidence, guard, fallback в цепочку
+- [x] `next_message_in_dialogue` (issue #28): один вызов вместо цепочки, дословный evidence, guard, fallback в цепочку
 - [x] Бенчмарк compose vs цепочки: 12 кейсов, офлайн-прогон зелёный, отчёт с честными ограничениями
 - [x] 305 юнит-тестов + песочница 43/43 + корпус 75/75
 - [x] Живая проверка на workerd: /health, REST и MCP для обоих методов

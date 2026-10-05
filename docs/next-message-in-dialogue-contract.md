@@ -1,4 +1,4 @@
-# compose_next_message_in_one_call — контракт (issue #28)
+# next_message_in_dialogue — контракт (issue #28)
 
 ## Зачем этот метод
 
@@ -6,11 +6,23 @@
 `extract_conversation_state` → `evaluate_next_goal` → `generate_next_message`. Для обычного
 продолжения это три вызова общей лестницы там, где содержания хватает на один.
 
-`compose_next_message_in_one_call` — эксперимент рядом с цепочкой, а не её замена:
+`next_message_in_dialogue` — эксперимент рядом с цепочкой, а не её замена:
 
 ```text
 диалог + цель диалога + ограничения -> {key_facts, next_goal, message} за ОДИН вызов
 ```
+
+## Как выбрать между двумя методами
+
+| ситуация | метод | почему |
+|---|---|---|
+| цель уже решена (вы её сформулировали или получили из своей логики) | `next_message_in_dialogue_from_goal` | вы сохраняете контроль над целью; метод только пишет текст |
+| цели ещё нет, есть только общая цель диалога | `next_message_in_dialogue` | метод сам выводит состояние и цель из истории |
+
+Это общий метод и его частный случай, а не два независимых способа: если у вас есть цель —
+берите `..._from_goal`, если нет — `next_message_in_dialogue`. Цепочка
+`extract_conversation_state` → `evaluate_next_goal` → `next_message_in_dialogue_from_goal`
+остаётся доступной пошагово и по-прежнему является эталоном и fallback'ом.
 
 **Существующая цепочка остаётся эталоном и fallback'ом.** Метод не становится production
 default: потребитель выбирает его явно (`fallback` плюс отдельный маршрут), пока владелец не
@@ -171,7 +183,7 @@ Fallback **не** срабатывает на:
 
 ```text
 POST /v1/conversations/compose
-POST /mcp tools/call compose_next_message_in_one_call
+POST /mcp tools/call next_message_in_dialogue
 ```
 
 Ошибки: `VALIDATION_ERROR` (400), `INPUT_TOO_LARGE` (400), `MODEL_PROFILE_NOT_ALLOWED` (400),

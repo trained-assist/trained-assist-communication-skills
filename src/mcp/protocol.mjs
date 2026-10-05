@@ -149,7 +149,7 @@ const GOAL_INPUT_SCHEMA = {
   }, required: ['conversation_revision', 'conversation_state', 'conversation_objective'],
 };
 
-// compose_next_message_in_one_call (issue #28) is the one-call alternative to the chain
+// next_message_in_dialogue (issue #28) is the one-call alternative to the chain
 // above: same dialog, same objective, one ladder call instead of three. It takes
 // the writer's material MINUS `goal` (the method formulates the goal itself)
 // PLUS `conversation_objective` (the chain's goal step needs it). `goal` is
@@ -191,14 +191,14 @@ const COMPOSE_INPUT_SCHEMA = {
 // one id from the caller's closed list. Its public answer stays two fields even
 // while evaluate_next_goal independently formulates an open goal from state.
 //
-// `compose_next_message_in_one_call` (issue #28) does state + goal + message in ONE ladder
+// `next_message_in_dialogue` (issue #28) does state + goal + message in ONE ladder
 // call. It is an experiment measured against the chain above, not a replacement:
 // the chain stays the reference and is the automatic fallback on any technical
 // failure. It never sends anything and never overrides a contact ban.
 export const TOOLS = [
   {
-    name: 'generate_next_message_to_conversation_partner',
-    description: 'Drafts ONE next outgoing message from the specified sender to the specified interlocutor, using their profile, dialog history and communication goal. Returns a draft; does not send it. Never re-asks a settled question, never ignores an open question from the interlocutor, and returns no_message_needed when the interlocutor asked to stop being contacted. After generating, the draft is checked by the guard and regenerated within the shared retry budget (2 attempts total).',
+    name: 'next_message_in_dialogue_from_goal',
+    description: 'Drafts ONE next outgoing message when you ALREADY have the goal: pass goal + communication_style + language + conversation_history and get a draft. This is the goal-driven variant of next_message_in_dialogue — use that one when there is no goal yet. Returns a draft; does not send it. Never re-asks a settled question, never ignores an open question from the interlocutor, and returns no_message_needed when the interlocutor asked to stop being contacted. After generating, the draft is checked by the guard and regenerated within the shared retry budget (2 attempts total).',
     inputSchema: {
       type: 'object',
       properties: INPUT_COMMON,
@@ -224,8 +224,8 @@ export const TOOLS = [
     outputSchema: buildDecisionResultSchema(),
   },
   {
-    name: 'compose_next_message_in_one_call',
-    description: 'One-call alternative to the state → goal → message chain: returns what happened (key_facts with verbatim evidence), the next goal and the message draft in a single ladder call. Statuses ready/wait/cannot_compose decide whether a draft exists; do_not_contact is detected server-side before any model call. Never sends anything and never overrides the consumer\'s freshness, duplicate or contact-ban checks. On a technical failure it runs the existing chain as a fallback (fallback:"off" disables that and returns a typed error instead).',
+    name: 'next_message_in_dialogue',
+    description: 'Drafts ONE next outgoing message when you do NOT have a goal yet: pass conversation_objective and this derives the state, the next goal and the message itself in a single ladder call, instead of calling extract_conversation_state → evaluate_next_goal → next_message_in_dialogue_from_goal. Use next_message_in_dialogue_from_goal instead when the goal is already decided — it is cheaper to reason about because you keep control of the goal. Returns what happened (key_facts with verbatim evidence), the next goal, and the draft. Statuses ready/wait/cannot_compose decide whether a draft exists; do_not_contact is detected server-side before any model call. Never sends anything and never overrides the consumer\'s freshness, duplicate or contact-ban checks. On a technical failure it runs the existing chain as a fallback (fallback:"off" disables that and returns a typed error instead).',
     inputSchema: COMPOSE_INPUT_SCHEMA,
     outputSchema: buildComposeAnswerSchema(),
   },

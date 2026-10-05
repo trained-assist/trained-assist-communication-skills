@@ -114,7 +114,7 @@ test('MCP tools/list отдаёт канонические инструмент�
   const res = await call('/mcp', { method: 'POST', headers: authed(), body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) });
   const { result } = await res.json();
   assert.equal(result.tools.length, 5);
-  assert.deepEqual(result.tools.map((t) => t.name), ['generate_next_message_to_conversation_partner', 'extract_conversation_state', 'evaluate_next_goal', 'resolve_user_intent', 'compose_next_message_in_one_call']);
+  assert.deepEqual(result.tools.map((t) => t.name), ['next_message_in_dialogue_from_goal', 'extract_conversation_state', 'evaluate_next_goal', 'resolve_user_intent', 'next_message_in_dialogue']);
   for (const t of result.tools) {
     assert.ok(t.inputSchema && t.description, `${t.name}: нужны inputSchema и description`);
   }
@@ -129,14 +129,20 @@ test('MCP tools/list отдаёт канонические инструмент�
   assert.deepEqual(intent.outputSchema.required, ['user_goal', 'decision']);
   assert.equal(intent.outputSchema.additionalProperties, false);
   assert.match(intent.description, /does not execute the selected decision/i);
-  // compose_next_message_in_one_call is the one-call experiment (issue #28): it publishes the
+  // next_message_in_dialogue is the one-call experiment (issue #28): it publishes the
   // same closed status list the validator enforces, minus the server-only status.
-  const compose = result.tools.find((t) => t.name === 'compose_next_message_in_one_call');
-  assert.deepEqual(compose.outputSchema.properties.status.enum, ['ready', 'wait', 'cannot_compose']);
-  assert.ok(compose.outputSchema.properties.key_facts);
-  assert.ok(compose.outputSchema.properties.next_goal);
-  assert.ok(compose.outputSchema.properties.message);
-  assert.match(compose.description, /one-call alternative/i);
+  const nextMessage = result.tools.find((t) => t.name === 'next_message_in_dialogue');
+  assert.deepEqual(nextMessage.outputSchema.properties.status.enum, ['ready', 'wait', 'cannot_compose']);
+  assert.ok(nextMessage.outputSchema.properties.key_facts);
+  assert.ok(nextMessage.outputSchema.properties.next_goal);
+  assert.ok(nextMessage.outputSchema.properties.message);
+  // Два метода сообщения — общий и его частный случай, и tools/list обязан это
+  // объяснять сам: иначе потребитель не поймёт, какой выбрать.
+  assert.match(nextMessage.description, /do NOT have a goal yet/i);
+  assert.match(nextMessage.description, /next_message_in_dialogue_from_goal/i);
+  const fromGoal = result.tools.find((t) => t.name === 'next_message_in_dialogue_from_goal');
+  assert.match(fromGoal.description, /ALREADY have the goal/i);
+  assert.match(fromGoal.description, /goal-driven variant of next_message_in_dialogue/i);
 });
 
 test('MCP Accept: text/event-stream → SSE-кадрирование', async () => {
@@ -175,7 +181,7 @@ test('tools/call отдаёт isError + типизированный код пр
   // LLM_LADDER_URL points at a closed port, so this exercises the real error path.
   const res = await call('/mcp', {
     method: 'POST', headers: authed(),
-    body: JSON.stringify({ jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'generate_next_message_to_conversation_partner', arguments: VALID_BODY } }),
+    body: JSON.stringify({ jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'next_message_in_dialogue_from_goal', arguments: VALID_BODY } }),
   });
   const { result } = await res.json();
   assert.equal(result.isError, true);
