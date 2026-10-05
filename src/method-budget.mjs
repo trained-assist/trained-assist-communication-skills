@@ -1,6 +1,10 @@
 'use strict';
 import { TypedError } from './typed-error.mjs';
-export const METHOD_TOTAL_BUDGET_MS = 60000;
+// A live ATS draft on 2026-10-05 showed a valid shared-ladder response arriving
+// after a fallback took ~57s, then being discarded at the old 60s method deadline
+// while state validation completed. Leave room for a slow fallback, one repair call,
+// and validation, while keeping an explicit upper bound on a method call.
+export const METHOD_TOTAL_BUDGET_MS = 120000;
 // All validation/guard repair attempts share the same method deadline. Provider
 // fallbacks remain owned by the shared ladder; this adds no independent retries.
 export function remainingMethodBudget(started, attempts = 0) {
