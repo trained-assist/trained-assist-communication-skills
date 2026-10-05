@@ -5,10 +5,11 @@ import { remainingMethodBudget } from './method-budget.mjs';
 import { parseLooseJson } from './intent-schema.mjs';
 import { buildStateResultSchema, validateStateResult, validateSupportedStateSchema } from './state-schema.mjs';
 import { renderStatePrompt } from './state-prompt.mjs';
+import { validateStateEvidence } from './state-evidence.mjs';
 import { TypedError, logEvent } from './typed-error.mjs';
 
 export const STATE_CONTRACT_VERSION = 'v1';
-export const STATE_PROMPT_VERSION = 'sp2';
+export const STATE_PROMPT_VERSION = 'sp3';
 export const STATE_LADDER_NAME = globalThis.process?.env?.LLM_LADDER_NAME || 'service:classify';
 export const STATE_MAX_ATTEMPTS = 2;
 export const STATE_MAX_INPUT_CHARS = 120000;
@@ -89,6 +90,12 @@ export function normalizeStateInput(raw) {
   }
 
   if (raw.extraction_instructions !== undefined && typeof raw.extraction_instructions !== 'string') problems.push('extraction_instructions: expected string');
+  if (raw.evidence_source_refs !== undefined) {
+    if (!isPlainObject(raw.evidence_source_refs)) problems.push('evidence_source_refs: expected object of source IDs to JSON pointers');
+    else for (const [id, pointer] of Object.entries(raw.evidence_source_refs)) {
+      if (!nonEmptyString(id) || typeof pointer !== 'string' || !pointer.startsWith('/') || /~(?![01])/u.test(pointer)) problems.push('evidence_source_refs: each source ID must reference a valid JSON pointer');
+    }
+  }
   for (const key of ['partner_profile', 'sender_profile', 'context', 'communication_plan']) {
     if (raw[key] !== undefined && raw[key] !== null && typeof raw[key] !== 'string' && !isPlainObject(raw[key])) problems.push(`${key}: expected string or object`);
   }
@@ -104,7 +111,7 @@ export function stateInputMetrics(input) {
     ? history.messages.reduce((sum, m) => sum + sizeOf(m.text), 0)
     : sizeOf(history.text);
   const schemaChars = sizeOf(input.state_schema);
-  const contextChars = [input.partner_profile, input.sender_profile, input.context, input.communication_plan, input.extraction_instructions].reduce((sum, value) => sum + sizeOf(value), 0);
+  const contextChars = [input.partner_profile, input.sender_profile, input.context, input.communication_plan, input.extraction_instructions, input.evidence_source_refs].reduce((sum, value) => sum + sizeOf(value), 0);
   return {
     history_messages: history.format === 'messages' ? history.messages.length : 1,
     history_chars: historyChars,
@@ -204,6 +211,11 @@ export async function extractConversationState(raw, env = {}) {
 
       const parsed = parseLooseJson(res.content);
       const checked = validateStateResult(parsed, input.state_schema);
+      if (checked.ok) {
+        const evidence = validateStateEvidence(checked.value.state, input);
+        checked.ok = evidence.ok;
+        checked.problems.push(...evidence.problems);
+      }
       remainingMethodBudget(t0, attempt);
       if (checked.ok) {
         const data = {

@@ -19,7 +19,8 @@ export function renderStatePrompt(input) {
     'Return exactly one JSON object with a single key: state.',
     'The value of state must validate against the provided schema.',
     'Use only facts present in the conversation history and supplied profile/context. Do not invent facts. Profile facts are not promises or agreements in the conversation. A plan describes desired results, not accomplished facts.',
-    'Keep quotes verbatim when the schema asks for quote/source fields.',
+    'Keep quotes verbatim when the schema asks for quote/source fields. Copy the exact original substring, including whitespace; never paraphrase.',
+    ...(input.evidence_source_refs !== undefined ? ['For source_id/quote evidence, use a supplied message id or a source ID from evidence_source_refs. Each reference is a JSON pointer into this input; only that referenced value is factual evidence for that ID. Plans, requirements and instructions outside the referenced value are not evidence.'] : []),
     'If a fact is uncertain, represent uncertainty only if the schema has a field for it; otherwise omit it or use an empty array.',
   ].join('\n');
   const user = [
@@ -27,7 +28,15 @@ export function renderStatePrompt(input) {
     `Conversation revision: ${input.conversation_revision ?? 'null'}`,
     '',
     ...(input.extraction_instructions ? ['Caller extraction instructions (interpretation of the supplied schema):', input.extraction_instructions, ''] : []),
-    ...['partner_profile', 'sender_profile', 'context', 'communication_plan'].filter(k => input[k] != null).flatMap(k => [k + ':', typeof input[k] === 'string' ? input[k] : JSON.stringify(input[k]), '']),
+    ...(input.evidence_source_refs !== undefined ? ['Evidence source references (JSON pointers into input, no duplicated source text):', JSON.stringify(input.evidence_source_refs), ''] : []),
+    ...['partner_profile', 'sender_profile', 'context', 'communication_plan'].filter(k => input[k] != null).flatMap(k => {
+      const value = input[k];
+      if ((k === 'partner_profile' || k === 'sender_profile') && value?.format === 'text' && typeof value.text === 'string') {
+        const { text, ...metadata } = value;
+        return [k + ':', JSON.stringify(metadata), text, ''];
+      }
+      return [k + ':', typeof value === 'string' ? value : JSON.stringify(value), ''];
+    }),
     'State schema:',
     schema,
     '',
