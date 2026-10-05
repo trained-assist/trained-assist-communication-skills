@@ -1,6 +1,6 @@
 'use strict';
 
-// Бенчмарк compose_next_message против существующей цепочки state → goal → message
+// Бенчмарк compose_next_message_in_one_call против существующей цепочки state → goal → message
 // (issue #28 §Бенчмарк).
 //
 // Один и тот же фиксированный набор синтетических диалогов (cases.json) прогоняется
@@ -450,7 +450,7 @@ export function renderReport({ metrics, fixtures }) {
     ];
 
   return [
-    '# Бенчмарк compose_next_message против цепочки state → goal → message',
+    '# Бенчмарк compose_next_message_in_one_call против цепочки state → goal → message',
     '',
     'Источник: [issue #28](https://github.com/trained-assist/trained-assist-communication-skills/issues/28).',
     'Связанные задачи: [эпик #11](https://github.com/trained-assist/trained-assist-communication-skills/issues/11),',

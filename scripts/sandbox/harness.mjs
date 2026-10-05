@@ -206,7 +206,7 @@ function evaluateExpectations(exp, data, isError, calls, text = '', prompts = []
     problems.push(`isError=${isError}, ожидалось ${exp.is_error}`);
   }
 
-  // resolve_user_intent отдаёт ровно два поля; compose_next_message прячет текст
+  // resolve_user_intent отдаёт ровно два поля; compose_next_message_in_one_call прячет текст
   // в message.text. Обе формы должны проверяться одинаково, иначе «черновик
   // пуст» для compose стал бы невыразимым.
   const messageText = data && (data.message_text ?? data.message?.text ?? (data.result && data.result.message_text));
@@ -250,7 +250,7 @@ function evaluateExpectations(exp, data, isError, calls, text = '', prompts = []
     }
   }
   if (exp.kind === 'compose') {
-    // Публичный ответ — пять полей контракта compose_next_message. Их ровно
+    // Публичный ответ — пять полей контракта compose_next_message_in_one_call. Их ровно
     // пять, и шестое поле означало бы, что метод подмевает диагностику в тело.
     if (exp.exact_fields) {
       const keys = Object.keys(data || {}).sort();
@@ -463,7 +463,7 @@ async function main() {
         && names.includes('extract_conversation_state')
         && names.includes('evaluate_next_goal')
         && names.includes('resolve_user_intent')
-        && names.includes('compose_next_message')
+        && names.includes('compose_next_message_in_one_call')
         && names.length === 5
         && (listed.result?.tools || []).every((t) => t.inputSchema && t.description),
         `serverInfo=${JSON.stringify(init.result?.serverInfo)}, tools=${JSON.stringify(names)}`);

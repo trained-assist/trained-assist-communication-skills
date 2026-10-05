@@ -114,7 +114,7 @@ test('MCP tools/list отдаёт канонические инструмент�
   const res = await call('/mcp', { method: 'POST', headers: authed(), body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) });
   const { result } = await res.json();
   assert.equal(result.tools.length, 5);
-  assert.deepEqual(result.tools.map((t) => t.name), ['generate_next_message_to_conversation_partner', 'extract_conversation_state', 'evaluate_next_goal', 'resolve_user_intent', 'compose_next_message']);
+  assert.deepEqual(result.tools.map((t) => t.name), ['generate_next_message_to_conversation_partner', 'extract_conversation_state', 'evaluate_next_goal', 'resolve_user_intent', 'compose_next_message_in_one_call']);
   for (const t of result.tools) {
     assert.ok(t.inputSchema && t.description, `${t.name}: нужны inputSchema и description`);
   }
@@ -129,9 +129,9 @@ test('MCP tools/list отдаёт канонические инструмент�
   assert.deepEqual(intent.outputSchema.required, ['user_goal', 'decision']);
   assert.equal(intent.outputSchema.additionalProperties, false);
   assert.match(intent.description, /does not execute the selected decision/i);
-  // compose_next_message is the one-call experiment (issue #28): it publishes the
+  // compose_next_message_in_one_call is the one-call experiment (issue #28): it publishes the
   // same closed status list the validator enforces, minus the server-only status.
-  const compose = result.tools.find((t) => t.name === 'compose_next_message');
+  const compose = result.tools.find((t) => t.name === 'compose_next_message_in_one_call');
   assert.deepEqual(compose.outputSchema.properties.status.enum, ['ready', 'wait', 'cannot_compose']);
   assert.ok(compose.outputSchema.properties.key_facts);
   assert.ok(compose.outputSchema.properties.next_goal);

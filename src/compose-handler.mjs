@@ -1,6 +1,6 @@
 'use strict';
 
-// compose_next_message (issue #28) — the one-call alternative to the
+// compose_next_message_in_one_call (issue #28) — the one-call alternative to the
 // state → goal → message chain.
 //
 // ONE ladder call returns what the chain returns in three: what happened
@@ -138,7 +138,7 @@ export function normalizeComposeInput(raw) {
   }
 
   if (problems.length) {
-    throw new TypedError('VALIDATION_ERROR', `вход не проходит контракт compose_next_message ${COMPOSE_CONTRACT_VERSION}`, { problems });
+    throw new TypedError('VALIDATION_ERROR', `вход не проходит контракт compose_next_message_in_one_call ${COMPOSE_CONTRACT_VERSION}`, { problems });
   }
 
   const chars = sizeOf(raw.conversation_objective) + sizeOf(raw.communication_style) + sizeOf(raw.conversation_history)

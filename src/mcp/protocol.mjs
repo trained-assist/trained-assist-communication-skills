@@ -149,7 +149,7 @@ const GOAL_INPUT_SCHEMA = {
   }, required: ['conversation_revision', 'conversation_state', 'conversation_objective'],
 };
 
-// compose_next_message (issue #28) is the one-call alternative to the chain
+// compose_next_message_in_one_call (issue #28) is the one-call alternative to the chain
 // above: same dialog, same objective, one ladder call instead of three. It takes
 // the writer's material MINUS `goal` (the method formulates the goal itself)
 // PLUS `conversation_objective` (the chain's goal step needs it). `goal` is
@@ -191,7 +191,7 @@ const COMPOSE_INPUT_SCHEMA = {
 // one id from the caller's closed list. Its public answer stays two fields even
 // while evaluate_next_goal independently formulates an open goal from state.
 //
-// `compose_next_message` (issue #28) does state + goal + message in ONE ladder
+// `compose_next_message_in_one_call` (issue #28) does state + goal + message in ONE ladder
 // call. It is an experiment measured against the chain above, not a replacement:
 // the chain stays the reference and is the automatic fallback on any technical
 // failure. It never sends anything and never overrides a contact ban.
@@ -224,7 +224,7 @@ export const TOOLS = [
     outputSchema: buildDecisionResultSchema(),
   },
   {
-    name: 'compose_next_message',
+    name: 'compose_next_message_in_one_call',
     description: 'One-call alternative to the state → goal → message chain: returns what happened (key_facts with verbatim evidence), the next goal and the message draft in a single ladder call. Statuses ready/wait/cannot_compose decide whether a draft exists; do_not_contact is detected server-side before any model call. Never sends anything and never overrides the consumer\'s freshness, duplicate or contact-ban checks. On a technical failure it runs the existing chain as a fallback (fallback:"off" disables that and returns a typed error instead).',
     inputSchema: COMPOSE_INPUT_SCHEMA,
     outputSchema: buildComposeAnswerSchema(),

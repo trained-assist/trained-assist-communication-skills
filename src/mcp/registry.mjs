@@ -19,7 +19,7 @@ export const TOOL_HANDLERS = Object.freeze({
   extract_conversation_state: extractConversationState,
   evaluate_next_goal: evaluateNextGoal,
   resolve_user_intent: resolveUserIntent,
-  compose_next_message: composeNextMessage,
+  compose_next_message_in_one_call: composeNextMessage,
 });
 
 export function toolDeps({ serverName, serverVersion, protocolVersion, tools }) {

@@ -1,4 +1,4 @@
-# Бенчмарк compose_next_message против цепочки state → goal → message
+# Бенчмарк compose_next_message_in_one_call против цепочки state → goal → message
 
 Источник: [issue #28](https://github.com/trained-assist/trained-assist-communication-skills/issues/28).
 Связанные задачи: [эпик #11](https://github.com/trained-assist/trained-assist-communication-skills/issues/11),

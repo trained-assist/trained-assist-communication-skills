@@ -1,4 +1,4 @@
-# compose_next_message — контракт (issue #28)
+# compose_next_message_in_one_call — контракт (issue #28)
 
 ## Зачем этот метод
 
@@ -6,7 +6,7 @@
 `extract_conversation_state` → `evaluate_next_goal` → `generate_next_message`. Для обычного
 продолжения это три вызова общей лестницы там, где содержания хватает на один.
 
-`compose_next_message` — эксперимент рядом с цепочкой, а не её замена:
+`compose_next_message_in_one_call` — эксперимент рядом с цепочкой, а не её замена:
 
 ```text
 диалог + цель диалога + ограничения -> {key_facts, next_goal, message} за ОДИН вызов
@@ -171,7 +171,7 @@ Fallback **не** срабатывает на:
 
 ```text
 POST /v1/conversations/compose
-POST /mcp tools/call compose_next_message
+POST /mcp tools/call compose_next_message_in_one_call
 ```
 
 Ошибки: `VALIDATION_ERROR` (400), `INPUT_TOO_LARGE` (400), `MODEL_PROFILE_NOT_ALLOWED` (400),

@@ -682,7 +682,7 @@
     {
       "id": "C1-compose-ready",
       "title": "Один вызов: состояние + цель + сообщение, ровно 1 вызов лестницы",
-      "tool": "compose_next_message",
+      "tool": "compose_next_message_in_one_call",
       "arguments": {
         "conversation_objective": "Квалифицировать опыт кандидата с CRM",
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
@@ -715,7 +715,7 @@
     {
       "id": "C2-compose-wait",
       "title": "wait: текста для отправки нет, лестница вызвана один раз",
-      "tool": "compose_next_message",
+      "tool": "compose_next_message_in_one_call",
       "arguments": {
         "conversation_objective": "Квалифицировать опыт кандидата с CRM",
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
@@ -745,7 +745,7 @@
     {
       "id": "C3-compose-guard-repair",
       "title": "Переспрос решённого вопроса отклоняется: 2 вызова, второй принят",
-      "tool": "compose_next_message",
+      "tool": "compose_next_message_in_one_call",
       "arguments": {
         "conversation_objective": "Квалифицировать опыт кандидата с CRM",
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
@@ -775,7 +775,7 @@
     {
       "id": "C4-compose-evidence-repair",
       "title": "Выдуманная цитата отклоняется валидатором evidence: 2 вызова",
-      "tool": "compose_next_message",
+      "tool": "compose_next_message_in_one_call",
       "arguments": {
         "conversation_objective": "Квалифицировать опыт кандидата с CRM",
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
@@ -804,7 +804,7 @@
     {
       "id": "C5-compose-json-repair",
       "title": "Невалидный JSON → ремонт с причиной, ровно 2 вызова",
-      "tool": "compose_next_message",
+      "tool": "compose_next_message_in_one_call",
       "arguments": {
         "conversation_objective": "Квалифицировать опыт кандидата с CRM",
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
@@ -833,7 +833,7 @@
     {
       "id": "C6-compose-fallback-chain",
       "title": "Обе попытки невалидны → существующая цепочка: 5 вызовов, ответ writer'а",
-      "tool": "compose_next_message",
+      "tool": "compose_next_message_in_one_call",
       "arguments": {
         "conversation_objective": "Квалифицировать опыт кандидата с CRM",
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
@@ -863,7 +863,7 @@
     {
       "id": "C7-compose-fallback-wait",
       "title": "Цепочка остановилась на этапе цели → wait без текста, 4 вызова",
-      "tool": "compose_next_message",
+      "tool": "compose_next_message_in_one_call",
       "arguments": {
         "conversation_objective": "Квалифицировать опыт кандидата с CRM",
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
@@ -893,7 +893,7 @@
     {
       "id": "C8-compose-do-not-contact",
       "title": "Запрет контакта: do_not_contact, лестница НЕ вызывается",
-      "tool": "compose_next_message",
+      "tool": "compose_next_message_in_one_call",
       "arguments": {
         "conversation_objective": "Квалифицировать опыт кандидата с CRM",
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
