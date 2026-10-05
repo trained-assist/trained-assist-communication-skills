@@ -465,6 +465,7 @@ export async function resolveUserIntent(raw, env = {}) {
             json_schema: { name: 'intent_resolution', strict: true, schema },
           },
           app: 'communication-skills-intent',
+          traceId,
         });
       } catch (e) {
         if (e instanceof LadderError) {
