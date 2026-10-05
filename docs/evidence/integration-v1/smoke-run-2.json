@@ -1,0 +1,129 @@
+{
+  "runId": "communication-v1-dc826525-f130-4c73-8349-e7783f1880e5",
+  "startedAt": "2026-10-05T01:35:35.552Z",
+  "scenarios": [
+    {
+      "name": "health",
+      "outcome": "pass",
+      "latencyMs": 254,
+      "version": "0.3.0"
+    },
+    {
+      "name": "unauthorized-mcp",
+      "outcome": "pass",
+      "latencyMs": 39
+    },
+    {
+      "name": "tools-list",
+      "outcome": "pass",
+      "latencyMs": 137,
+      "methods": [
+        "generate_next_message_to_conversation_partner",
+        "extract_conversation_state",
+        "evaluate_next_goal",
+        "resolve_user_intent"
+      ]
+    },
+    {
+      "name": "health-question",
+      "outcome": "pass",
+      "latencyMs": 1305,
+      "decision": "system_health",
+      "requestId": "communication-v1-dc826525-f130-4c73-8349-e7783f1880e5:health-question",
+      "provider": {
+        "model": "opencode-go/space-bunny-free",
+        "attempts": 1,
+        "ladderMs": 1270,
+        "inputTokens": 2031,
+        "outputTokens": 36,
+        "warnings": 0
+      }
+    },
+    {
+      "name": "health-paraphrase",
+      "outcome": "pass",
+      "latencyMs": 1915,
+      "decision": "system_health",
+      "requestId": "communication-v1-dc826525-f130-4c73-8349-e7783f1880e5:health-paraphrase",
+      "provider": {
+        "model": "opencode-go/space-bunny-free",
+        "attempts": 1,
+        "ladderMs": 1882,
+        "inputTokens": 2039,
+        "outputTokens": 113,
+        "warnings": 0
+      }
+    },
+    {
+      "name": "capabilities-question",
+      "outcome": "pass",
+      "latencyMs": 1342,
+      "decision": "catalog.brief",
+      "requestId": "communication-v1-dc826525-f130-4c73-8349-e7783f1880e5:capabilities-question",
+      "provider": {
+        "model": "opencode-go/space-bunny-free",
+        "attempts": 1,
+        "ladderMs": 1309,
+        "inputTokens": 2033,
+        "outputTokens": 30,
+        "warnings": 0
+      }
+    },
+    {
+      "name": "capabilities-paraphrase",
+      "outcome": "pass",
+      "latencyMs": 1410,
+      "decision": "catalog.brief",
+      "requestId": "communication-v1-dc826525-f130-4c73-8349-e7783f1880e5:capabilities-paraphrase",
+      "provider": {
+        "model": "opencode-go/space-bunny-free",
+        "attempts": 1,
+        "ladderMs": 1375,
+        "inputTokens": 2041,
+        "outputTokens": 29,
+        "warnings": 0
+      }
+    },
+    {
+      "name": "compound-task",
+      "outcome": "pass",
+      "latencyMs": 4280,
+      "decision": "agent",
+      "requestId": "communication-v1-dc826525-f130-4c73-8349-e7783f1880e5:compound-task",
+      "provider": {
+        "model": "opencode-go/space-bunny-free",
+        "attempts": 1,
+        "ladderMs": 4247,
+        "inputTokens": 2057,
+        "outputTokens": 217,
+        "warnings": 0
+      }
+    },
+    {
+      "name": "compound-with-health",
+      "outcome": "pass",
+      "latencyMs": 4535,
+      "decision": "agent",
+      "requestId": "communication-v1-dc826525-f130-4c73-8349-e7783f1880e5:compound-with-health",
+      "provider": {
+        "model": "opencode-go/space-bunny-free",
+        "attempts": 1,
+        "ladderMs": 4497,
+        "inputTokens": 2044,
+        "outputTokens": 126,
+        "warnings": 0
+      }
+    },
+    {
+      "name": "unknown-request",
+      "outcome": "fail",
+      "reason": "Expected values to be strictly equal:\n+ actual - expected\n\n+ 'agent'\n- 'no_matching_option'\n"
+    }
+  ],
+  "summary": {
+    "total": 10,
+    "passed": 9,
+    "failed": 1
+  },
+  "finishedAt": "2026-10-05T01:35:54.586Z"
+}

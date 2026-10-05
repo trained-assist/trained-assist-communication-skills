@@ -14,7 +14,11 @@ const options = [
   {
     id: 'system_health',
     description: 'Проверить фактическое состояние компонентов системы и сообщить доступность.',
-    applicability: 'Только вопрос о работоспособности. Не подходит, если пользователь также просит выполнить другую задачу.',
+    applicability:
+      'Вопрос о работоспособности, доступности или готовности ассистента и системы отвечать пользователю. ' +
+      'Выбор этого варианта лишь направляет запрос к реальной проверке состояния, которая выполняется ПОСЛЕ классификации: ' +
+      'классификатору не нужно знать фактическое состояние, не нужно его утверждать или опровергать. ' +
+      'Не подходит, если пользователь также просит выполнить другую задачу.',
   },
   {
     id: 'catalog.brief',
@@ -27,6 +31,11 @@ const options = [
     applicability: 'Обработка таблиц или файлов, внешние действия, составной запрос, уточнение неизвестной задачи. Не подходит для простого вопроса о состоянии или возможностях системы.',
   },
 ];
+
+const recipient = {
+  role: 'Ассистент trained-assist',
+  scope: 'отвечает на вопросы пользователя, включая вопросы о работоспособности системы',
+};
 
 async function request(path, body, authenticated = true) {
   const headers = { 'content-type': 'application/json' };
@@ -83,9 +92,12 @@ await record('tools-list', async () => {
 
 for (const [name, text, expected] of [
   ['health-question', 'Работает?', 'system_health'],
-  ['capabilities-question', 'Что ты умеешь?', 'catalog.brief'],
   ['health-paraphrase', 'Ты сейчас на связи и можешь отвечать?', 'system_health'],
+  ['capabilities-question', 'Что ты умеешь?', 'catalog.brief'],
+  ['capabilities-paraphrase', 'Какие у тебя функции и что можно подключить?', 'catalog.brief'],
   ['compound-task', 'Работает? Тогда прочитай таблицу расходов, найди дубли и создай отдельный лист с итогами.', 'agent'],
+  ['compound-with-health', 'Переведи этот файл и проверь, работает ли сервис', 'agent'],
+  ['unknown-request', 'Удали мою подписку', 'no_matching_option'],
 ]) {
   await record(name, async () => {
     const response = await rpc('tools/call', {
@@ -94,7 +106,7 @@ for (const [name, text, expected] of [
         request_id: `${runId}:${name}`,
         trace_id: runId,
         input_bundle: { id: `${runId}:${name}`, version: 'v1', events: [{ id: 'message-1', type: 'text', author: 'user', text }] },
-        recipient: { role: 'Помощник trained-assist' },
+        recipient,
         decision_options: options,
         dialog_context: { history: [], active_tasks: [] },
         options: { language: 'ru' },
@@ -106,9 +118,27 @@ for (const [name, text, expected] of [
     assert.ok(!result?.isError, `resolver failed: ${result?.structuredContent?.error?.code ?? 'unknown'}`);
     assert.deepEqual(Object.keys(result.structuredContent).sort(), ['decision', 'user_goal']);
     assert.equal(result.structuredContent.decision, expected);
-    return { latencyMs: response.latencyMs, decision: result.structuredContent.decision, requestId: `${runId}:${name}` };
+    const meta = result._meta ?? {};
+    return {
+      latencyMs: response.latencyMs,
+      decision: result.structuredContent.decision,
+      requestId: `${runId}:${name}`,
+      provider: {
+        model: meta.generation?.model ?? null,
+        attempts: meta.generation?.attempts ?? null,
+        ladderMs: meta.timing?.total_ms ?? null,
+        inputTokens: meta.usage?.input_tokens ?? null,
+        outputTokens: meta.usage?.output_tokens ?? null,
+        warnings: Array.isArray(meta.warnings) ? meta.warnings.length : 0,
+      },
+    };
   });
 }
 
+report.summary = {
+  total: report.scenarios.length,
+  passed: report.scenarios.filter((s) => s.outcome === 'pass').length,
+  failed: report.scenarios.filter((s) => s.outcome === 'fail').length,
+};
 report.finishedAt = new Date().toISOString();
 if (process.env.INTEGRATION_REPORT_FILE) writeFileSync(process.env.INTEGRATION_REPORT_FILE, JSON.stringify(report, null, 2));
