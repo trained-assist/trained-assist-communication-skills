@@ -45,12 +45,15 @@ jobs:
           set -euo pipefail
           for attempt in 1 2 3 4 5 6; do
             if HEALTH=$(curl -fsS --max-time 10 https://trained-assist-communication-skills.skillset-apply.workers.dev/health); then
-              ACTUAL_BUILD_SHA=$(printf '%s' "$HEALTH" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const h=JSON.parse(s);if(typeof h.build!=="string"||!h.build)process.exitCode=2;else process.stdout.write(h.build)}catch{process.exitCode=2}})')
+              # A newly deployed Worker may briefly serve an older health payload
+              # while edge propagation completes. Treat malformed/missing build
+              # metadata as a retryable mismatch, not a shell failure.
+              ACTUAL_BUILD_SHA=$(printf '%s' "$HEALTH" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const h=JSON.parse(s);if(typeof h.build==="string"&&h.build)process.stdout.write(h.build)}catch{}})' || true)
               if [ "$ACTUAL_BUILD_SHA" = "$EXPECTED_BUILD_SHA" ]; then
                 echo "Public Communication Worker revision verified: $ACTUAL_BUILD_SHA"
                 exit 0
               fi
-              echo "Waiting for public revision: got $ACTUAL_BUILD_SHA, expected $EXPECTED_BUILD_SHA"
+              echo "Waiting for public revision: got ${ACTUAL_BUILD_SHA:-missing build metadata}, expected $EXPECTED_BUILD_SHA"
             fi
             sleep 10
           done
