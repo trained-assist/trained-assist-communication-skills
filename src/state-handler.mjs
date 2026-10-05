@@ -197,6 +197,10 @@ export async function extractConversationState(raw, env = {}) {
             type: 'json_schema',
             json_schema: { name: 'conversation_state', strict: true, schema: resultSchema },
           },
+          // State extraction is a bounded classification task. Asking a reasoning
+          // rung for unrestricted chain-of-thought consumed the whole 120s method
+          // budget on large candidate histories; low effort keeps the JSON answer fast.
+          reasoningEffort: 'low',
           app: 'communication-skills-state',
           traceId,
           totalTimeoutMs: remainingMethodBudget(t0, attempt - 1),

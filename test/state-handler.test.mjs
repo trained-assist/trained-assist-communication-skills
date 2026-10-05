@@ -102,6 +102,7 @@ test('success: extracts state, echoes revision, sends strict schema to ladder', 
     assert.equal(r.meta.conversation_revision, 'history-v7');
     assert.equal(stub.calls.length, 1);
     assert.equal(stub.calls[0].body.model, 'service:classify');
+    assert.equal(stub.calls[0].body.reasoning_effort, 'low');
     assert.equal(stub.calls[0].body.response_format.json_schema.schema.required[0], 'state');
   } finally { stub.restore(); }
 });

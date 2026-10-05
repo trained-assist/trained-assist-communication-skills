@@ -14,6 +14,9 @@ function stub({contents=[],elapsed=[0],failure=false}={}){
 test('shared ladder permits one 60s rung within the fixed 60s total budget',async()=>{
  const f=stub({contents:['done']});try{await ladderChat({baseUrl:ENV.LLM_LADDER_URL,token:ENV.LLM_LADDER_TOKEN,model:'service:classify',messages:[{role:'user',content:'fixture'}]});assert.equal(f.calls[0].ladder_timeout_ms,60000);assert.equal(f.calls[0].ladder_total_timeout_ms,60000);assert.deepEqual(f.timeouts,[65000]);}finally{f.restore();}
 });
+test('reasoning effort is an explicit allowlisted provider option',async()=>{
+ const f=stub({contents:['done']});try{await ladderChat({baseUrl:ENV.LLM_LADDER_URL,token:ENV.LLM_LADDER_TOKEN,model:'service:classify',messages:[{role:'user',content:'fixture'}],reasoningEffort:'low'});assert.equal(f.calls[0].reasoning_effort,'low');await assert.rejects(ladderChat({baseUrl:ENV.LLM_LADDER_URL,messages:[{role:'user',content:'fixture'}],reasoningEffort:'unbounded'}),LadderError);}finally{f.restore();}
+});
 const methods=[
  {name:'state',run:()=>extractConversationState({request_id:'state-budget',trace_id:'state-trace',conversation_revision:'rev',conversation_history:{format:'messages',messages:[]},state_schema:{type:'object',properties:{summary:{type:'string'}},required:['summary'],additionalProperties:false}},ENV),invalid:'not-json',valid:JSON.stringify({state:{summary:'fixture'}})},
  {name:'goal',run:()=>evaluateNextGoal({request_id:'goal-budget',trace_id:'goal-trace',conversation_revision:'rev',conversation_state:{},conversation_objective:'Следовать синтетическому сценарию'},ENV),invalid:'not-json',valid:JSON.stringify({status:'wait'})},
