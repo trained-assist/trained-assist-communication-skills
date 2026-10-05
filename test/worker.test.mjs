@@ -25,6 +25,22 @@ const VALID_BODY = {
   conversation_history: { format: 'messages', messages: [] },
 };
 
+const COMPOSE_ARGS = {
+  conversation_objective: 'Квалифицировать опыт кандидата с CRM',
+  communication_style: { instructions: 'Ты — рекрутер. Коротко.' },
+  language: 'ru',
+  conversation_history: {
+    format: 'messages',
+    messages: [
+      { id: 'm1', speaker: 'sender', text: 'Подскажите, с какими CRM вы работали?' },
+      { id: 'm2', speaker: 'partner', text: 'Да, готов выполнить тестовое задание.' },
+    ],
+  },
+  context: { vacancy: 'Менеджер по продажам, Москва' },
+  constraints: { max_characters: 600, max_questions: 1 },
+  goal: { instruction: 'Уточнить объём продаж и количество карточек', required_points: [], forbidden_points: [] },
+};
+
 test('GET /health — публичный, без токена, и честно сообщает readiness', async () => {
   const res = await call('/health');
   assert.equal(res.status, 200);
@@ -97,8 +113,8 @@ test('MCP initialize через HTTP отдаёт сервер и протоко
 test('MCP tools/list отдаёт канонические инструменты со схемами', async () => {
   const res = await call('/mcp', { method: 'POST', headers: authed(), body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }) });
   const { result } = await res.json();
-  assert.equal(result.tools.length, 4);
-  assert.deepEqual(result.tools.map((t) => t.name), ['generate_next_message_to_conversation_partner', 'extract_conversation_state', 'evaluate_next_goal', 'resolve_user_intent']);
+  assert.equal(result.tools.length, 5);
+  assert.deepEqual(result.tools.map((t) => t.name), ['generate_next_message_to_conversation_partner', 'extract_conversation_state', 'evaluate_next_goal', 'resolve_user_intent', 'compose_next_message']);
   for (const t of result.tools) {
     assert.ok(t.inputSchema && t.description, `${t.name}: нужны inputSchema и description`);
   }
@@ -113,6 +129,14 @@ test('MCP tools/list отдаёт канонические инструмент�
   assert.deepEqual(intent.outputSchema.required, ['user_goal', 'decision']);
   assert.equal(intent.outputSchema.additionalProperties, false);
   assert.match(intent.description, /does not execute the selected decision/i);
+  // compose_next_message is the one-call experiment (issue #28): it publishes the
+  // same closed status list the validator enforces, minus the server-only status.
+  const compose = result.tools.find((t) => t.name === 'compose_next_message');
+  assert.deepEqual(compose.outputSchema.properties.status.enum, ['ready', 'wait', 'cannot_compose']);
+  assert.ok(compose.outputSchema.properties.key_facts);
+  assert.ok(compose.outputSchema.properties.next_goal);
+  assert.ok(compose.outputSchema.properties.message);
+  assert.match(compose.description, /one-call alternative/i);
 });
 
 test('MCP Accept: text/event-stream → SSE-кадрирование', async () => {
@@ -303,6 +327,59 @@ test('MCP tools/call evaluate_next_goal: terminal wait returns no writer goal', 
     assert.equal(result.structuredContent.goal, null);
     assert.equal(stub.calls.length, 1);
   } finally { stub.restore(); }
+});
+
+test('POST /v1/conversations/compose: один вызов лестницы и контрактный ответ', async () => {
+  const stub = stubLadder([{ content: JSON.stringify({
+    status: 'ready',
+    key_facts: [{ fact: 'Кандидат подтвердил готовность к тестовому', evidence: { quote: 'Да, готов', message_id: 'm2' } }],
+    next_goal: { instruction: 'Уточнить объём продаж и количество карточек', required_points: [], forbidden_points: [] },
+    message: { text: 'Уточните, пожалуйста, объём продаж.', language: 'ru' },
+    warnings: [],
+  }) }]);
+  try {
+    const res = await call('/v1/conversations/compose', { method: 'POST', headers: authed(), body: JSON.stringify(COMPOSE_ARGS) });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.status, 'ready');
+    assert.equal(body.message.text, 'Уточните, пожалуйста, объём продаж.');
+    assert.equal(res.headers.get('x-contract-version'), 'v1');
+    assert.equal(JSON.parse(res.headers.get('x-communication-diagnostics')).fallback, undefined);
+    assert.equal(stub.calls.length, 1);
+  } finally { stub.restore(); }
+});
+
+test('POST /v1/conversations/compose: fallback помечен в диагностике и версией цепочки', async () => {
+  const stub = stubLadder([
+    { status: 502, message: 'every rung failed' },
+    { content: '{"state":{"contact_allowed":true,"do_not_contact":false}}' },
+    { content: '{"status":"goal_ready","goal":{"instruction":"Уточнить объём продаж и количество карточек"}}' },
+    { content: 'Уточните, пожалуйста, объём продаж.' },
+  ]);
+  try {
+    const res = await call('/v1/conversations/compose', { method: 'POST', headers: authed(), body: JSON.stringify(COMPOSE_ARGS) });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    // Ответ — ответ writer'а: его форма и его версия контракта.
+    assert.equal(body.status, 'generated');
+    assert.equal(body.message_text, 'Уточните, пожалуйста, объём продаж.');
+    assert.equal(res.headers.get('x-contract-version'), 'v1');
+    const meta = JSON.parse(res.headers.get('x-communication-diagnostics'));
+    assert.equal(meta.fallback.used, true);
+    assert.equal(stub.calls.length, 4);
+  } finally { stub.restore(); }
+});
+
+test('POST /v1/conversations/compose без токена → 401', async () => {
+  const res = await call('/v1/conversations/compose', { method: 'POST', body: JSON.stringify(COMPOSE_ARGS) });
+  assert.equal(res.status, 401);
+});
+
+test('POST /v1/conversations/compose без цели диалога → 400 VALIDATION_ERROR', async () => {
+  const res = await call('/v1/conversations/compose', { method: 'POST', headers: authed(), body: JSON.stringify({ ...COMPOSE_ARGS, conversation_objective: '' }) });
+  assert.equal(res.status, 400);
+  const body = await res.json();
+  assert.equal(body.error.code, 'VALIDATION_ERROR');
 });
 
 test('POST /v1/conversations/state/extract без токена → 401', async () => {

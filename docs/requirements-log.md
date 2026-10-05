@@ -53,6 +53,15 @@
 | R48 | Лестница резолвера — `service:classify`, не `conversation` (решение владельца 17.10) | живой корпус: accuracy 0.883 против 0.852, infra 3 против 5–22, p50 3.6 с против 6.4 с | done |
 | R46 | Workers AI как классификатор (#10 §7) | — | отклонено: ADR-0001 запрещает собственную конфигурацию моделей и ключи |
 | R47 | Регистрация resolver'а в core (agent#2034) | — | planned: отдельный план |
+| R48 | compose_next_message: один вызов вместо цепочки, контракт с именем, входом, JSON Schema, семантикой статусов, правилами message=null | `docs/compose-next-message-contract.md`, `test/compose-schema.test.mjs`, песочница C1–C8 | done |
+| R49 | Успешный путь делает ровно один вызов лестницы; тест фиксирует число вызовов | `test/compose-handler.test.mjs` («успешный путь: ровно один вызов»), `test/benchmark.test.mjs` | done |
+| R50 | Ответ всегда проходит серверную валидацию; невалидный JSON/enum/evidence не выдаётся как готовое сообщение | `src/compose-schema.mjs`, `test/compose-schema.test.mjs` (14 тестов) | done |
+| R51 | Ошибка/таймаут/непригодный ответ запускают существующую цепочку и остаются наблюдаемыми как fallback | `src/compose-handler.mjs` (`runChainFallback`), `test/compose-handler.test.mjs` (4 теста), песочница C6/C7 | done |
+| R52 | wait / no-contact / нехватка данных не создают текст для отправки; запрет контакта — серверная ответственность | `test/compose-schema.test.mjs` («wait с message отклоняется»), песочница C2/C8 | done |
+| R53 | Воспроизводимый benchmark-отчёт: качество, p50/p95, токены, стоимость, first-pass, fallback на фиксированных данных | `scripts/benchmark/report.md`, `test/benchmark.test.mjs` (8 тестов) | частично: офлайн-прогон зелёный; живой прогон требует секретов лестницы |
+| R54 | Новый метод не становится production default; включение — явным выбором метода/флага | `fallback: "chain" \| "off"`, отдельный маршрут `/v1/conversations/compose` | done |
+| R55 | Генерация не отправляет сообщение и не обходит downstream freshness/duplicate/contact-forbidden guards | `test/compose-handler.test.mjs` («ответ не содержит полей отправки»), песочница C1 (`absent_fields`) | done |
+| R56 | Ссылки на эпик #11 и ревью #23; выводы по задержке/токенам сверены с #23 | `docs/compose-next-message-contract.md`, `scripts/benchmark/report.md` | частично: ссылки есть; сверка с #23 — открытая работа |
 
 ## Замеры, на которых основаны deferred-решения
 

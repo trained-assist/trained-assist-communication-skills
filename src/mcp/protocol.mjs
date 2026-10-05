@@ -10,6 +10,7 @@
 import { buildIntentInputSchema, buildDecisionResultSchema } from '../intent-schema.mjs';
 import { buildStateResultSchema } from '../state-schema.mjs';
 import { buildGoalResultSchema } from '../goal-schema.mjs';
+import { buildComposeAnswerSchema } from '../compose-schema.mjs';
 
 export const SERVER_NAME = 'trained-assist-communication-skills';
 export const SERVER_VERSION = '0.3.0';
@@ -148,6 +149,35 @@ const GOAL_INPUT_SCHEMA = {
   }, required: ['conversation_revision', 'conversation_state', 'conversation_objective'],
 };
 
+// compose_next_message (issue #28) is the one-call alternative to the chain
+// above: same dialog, same objective, one ladder call instead of three. It takes
+// the writer's material MINUS `goal` (the method formulates the goal itself)
+// PLUS `conversation_objective` (the chain's goal step needs it). `goal` is
+// accepted but ignored by the compose path — it exists so the internal chain
+// fallback has a writer goal to run with.
+const COMPOSE_INPUT_SCHEMA = {
+  type: 'object',
+  additionalProperties: true,
+  properties: {
+    request_id: { type: 'string' },
+    trace_id: { type: 'string' },
+    context_revision: { type: 'string', description: 'Revision of the history being composed from. Echoed so a stale draft can be discarded.' },
+    conversation_objective: { type: 'string', description: 'High-level objective of the dialog; the next goal is derived from it.' },
+    communication_style: INPUT_COMMON.communication_style,
+    language: INPUT_COMMON.language,
+    conversation_history: INPUT_COMMON.conversation_history,
+    partner_profile: INPUT_COMMON.partner_profile,
+    sender_profile: INPUT_COMMON.sender_profile,
+    context: INPUT_COMMON.context,
+    constraints: INPUT_COMMON.constraints,
+    goal: INPUT_COMMON.goal,
+    material_bindings: GOAL_INPUT_SCHEMA.properties.material_bindings,
+    fallback: { type: 'string', enum: ['chain', 'off'], description: 'chain (default): run the existing state → goal → message chain when the one-call answer is unusable. off: return a typed error instead. The chain needs `goal`, so without it a fallback is impossible.' },
+    model_profile: { type: 'string', description: 'Server allowlist only; concrete model/rung stays in the shared ladder.' },
+  },
+  required: ['conversation_objective', 'communication_style', 'language', 'conversation_history'],
+};
+
 // The canonical tool (issue #6 §1). `evaluate_message_quality` is intentionally
 // NOT exposed over MCP any more: it existed so third-party generators could reuse
 // the guard, and no external consumer needs a separate quality tool. The guard is
@@ -160,6 +190,11 @@ const GOAL_INPUT_SCHEMA = {
 // `resolve_user_intent` (issue #10) formulates the user's goal and picks exactly
 // one id from the caller's closed list. Its public answer stays two fields even
 // while evaluate_next_goal independently formulates an open goal from state.
+//
+// `compose_next_message` (issue #28) does state + goal + message in ONE ladder
+// call. It is an experiment measured against the chain above, not a replacement:
+// the chain stays the reference and is the automatic fallback on any technical
+// failure. It never sends anything and never overrides a contact ban.
 export const TOOLS = [
   {
     name: 'generate_next_message_to_conversation_partner',
@@ -187,6 +222,12 @@ export const TOOLS = [
     description: 'Infer the user\'s goal from the supplied input and context, then select exactly one of the caller-provided decision options. Return no_matching_option when none applies. Does not execute the selected decision.',
     inputSchema: buildIntentInputSchema(),
     outputSchema: buildDecisionResultSchema(),
+  },
+  {
+    name: 'compose_next_message',
+    description: 'One-call alternative to the state → goal → message chain: returns what happened (key_facts with verbatim evidence), the next goal and the message draft in a single ladder call. Statuses ready/wait/cannot_compose decide whether a draft exists; do_not_contact is detected server-side before any model call. Never sends anything and never overrides the consumer\'s freshness, duplicate or contact-ban checks. On a technical failure it runs the existing chain as a fallback (fallback:"off" disables that and returns a typed error instead).',
+    inputSchema: COMPOSE_INPUT_SCHEMA,
+    outputSchema: buildComposeAnswerSchema(),
   },
 ];
 

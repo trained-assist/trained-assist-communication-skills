@@ -17,10 +17,15 @@
 // one-event SSE fallback — enough for `initialize` / `tools/list` / `tools/call`,
 // which is what a stateless worker-hosted MCP server is actually used for.
 
-import { generateNextMessage, CONTRACT_VERSION, PROMPT_VERSION, MAX_ATTEMPTS } from './handler.mjs';
+// CONTRACT_VERSION is aliased here because /v1/conversations/compose can return a
+// FALLBACK result, and that result is the writer's answer with the writer's
+// contract version. Naming the same constant twice keeps the door honest about
+// which of the two contracts the caller is looking at.
+import { generateNextMessage, CONTRACT_VERSION, CONTRACT_VERSION as WRITER_CONTRACT_VERSION, PROMPT_VERSION, MAX_ATTEMPTS } from './handler.mjs';
 import { resolveUserIntent, INTENT_CONTRACT_VERSION, INTENT_PROMPT_VERSION } from './intent-handler.mjs';
 import { extractConversationState, STATE_CONTRACT_VERSION, STATE_PROMPT_VERSION } from './state-handler.mjs';
 import { evaluateNextGoal, GOAL_CONTRACT_VERSION } from './goal-handler.mjs';
+import { composeNextMessage, COMPOSE_CONTRACT_VERSION } from './compose-handler.mjs';
 import { TOOLS, SERVER_NAME, SERVER_VERSION, PROTOCOL_VERSION, handleMcpMessage } from './mcp/protocol.mjs';
 import { toolDeps } from './mcp/registry.mjs';
 
@@ -94,7 +99,7 @@ export default {
 
     if (url.pathname === '/health') return serveHealth(env);
     if (url.pathname === '/') {
-      return json(200, { service: SERVER_NAME, contract_version: CONTRACT_VERSION, endpoints: ['/health', '/mcp', '/v1/dialogs/next-message', '/v1/conversations/state/extract', '/v1/conversations/next-goal', '/v1/intents/resolve'] });
+      return json(200, { service: SERVER_NAME, contract_version: CONTRACT_VERSION, endpoints: ['/health', '/mcp', '/v1/dialogs/next-message', '/v1/conversations/state/extract', '/v1/conversations/next-goal', '/v1/conversations/compose', '/v1/intents/resolve'] });
     }
 
     const auth = authorized(request, env);
@@ -158,6 +163,20 @@ export default {
       });
     }
 
+    // ── REST door: compose_next_message (issue #28) ──────────────────────────
+    // The one-call alternative to the chain. The contract version in the header
+    // tells the caller which path actually produced the answer: a fallback
+    // result IS the writer's result, and labelling it as composed would be a lie.
+    if (url.pathname === '/v1/conversations/compose') {
+      if (request.method !== 'POST') return json(405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'используй POST' } });
+      const body = await readJson(request);
+      if (!body.ok) return json(400, { error: { code: 'INVALID_INPUT', message: body.message, retryable: false } });
+      const out = await composeNextMessage(body.value, env);
+      if (out.isError) return json(statusForCode(out.data?.error?.code), out.data, { 'x-contract-version': COMPOSE_CONTRACT_VERSION });
+      const version = out.meta?.fallback?.used ? WRITER_CONTRACT_VERSION : COMPOSE_CONTRACT_VERSION;
+      return json(200, out.data, { 'x-contract-version': version, 'x-communication-request-id': out.meta?.request_id ?? null, 'x-communication-diagnostics': JSON.stringify(out.meta ?? {}) });
+    }
+
     // ── MCP door ───────────────────────────────────────────────────────────
     if (url.pathname === '/mcp') {
       if (request.method === 'GET') {
@@ -199,6 +218,7 @@ function statusForCode(code) {
     case 'INTENT_REJECTED':
     case 'STATE_REJECTED':
     case 'GOAL_REJECTED':
+    case 'COMPOSE_REJECTED':
       return 422;
     case 'MODEL_OUTPUT_INVALID':
       return 502;

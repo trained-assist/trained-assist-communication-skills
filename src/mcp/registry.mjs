@@ -12,12 +12,14 @@ import { generateNextMessage } from '../handler.mjs';
 import { resolveUserIntent } from '../intent-handler.mjs';
 import { extractConversationState } from '../state-handler.mjs';
 import { evaluateNextGoal } from '../goal-handler.mjs';
+import { composeNextMessage } from '../compose-handler.mjs';
 
 export const TOOL_HANDLERS = Object.freeze({
   generate_next_message_to_conversation_partner: generateNextMessage,
   extract_conversation_state: extractConversationState,
   evaluate_next_goal: evaluateNextGoal,
   resolve_user_intent: resolveUserIntent,
+  compose_next_message: composeNextMessage,
 });
 
 export function toolDeps({ serverName, serverVersion, protocolVersion, tools }) {

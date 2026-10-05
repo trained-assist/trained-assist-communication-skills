@@ -1,0 +1,1351 @@
+{
+  "_note": [
+    "Фиксированный набор синтетических диалогов для бенчмарка compose_next_message",
+    "против существующей цепочки state -> goal -> message (issue #28 §Бенчмарк).",
+    "",
+    "Разметка зафиксирована ДО сравнения и версионируется вместе с этим файлом:",
+    "expected — что помечено заранее, script — что отвечает подменённая лестница",
+    "в офлайн-режиме. Живой режим читает только input и expected, script там игнорируется.",
+    "",
+    "Персональных данных нет: имена вымышленные, резюме нет, тексты диалогов синтетические",
+    "и не взяты из production. Настоящие переписки в бенчмарк не попадают.",
+    "",
+    "У двух путей РАЗНЫЕ словари статусов (compose: ready/wait/cannot_compose/do_not_contact;",
+    "цепочка: generated/needs_context/no_message_needed/wait/do_not_contact), поэтому ожидаемый",
+    "статус задан для каждого пути отдельно — иначе сравнение измеряло бы словарь, а не метод.",
+    "",
+    "message: required | absent | any — требуется ли текст сообщения в принципе.",
+    "compose_facts_include проверяется только у compose: цепочка отдаёт состояние отдельным",
+    "вызовом, и сравнивать его с меткой key_facts было бы нечестно.",
+    "",
+    "Десять типов ситуаций из issue #28 плюс два контрольных. difficulty:",
+    "  simple      — однозначное продолжение",
+    "  ambiguous   — неоднозначность, отказ, исправление прежнего ответа"
+  ],
+  "cases": [
+    {
+      "id": "B01",
+      "title": "Первый контакт: история пуста",
+      "kind": "first-contact",
+      "difficulty": "simple",
+      "input": {
+        "conversation_objective": "Договориться о первом созвоне по вакансии менеджера по продажам",
+        "communication_style": {
+          "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», короткие абзацы, без канцелярита и восклицательных знаков."
+        },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": []
+        },
+        "partner_profile": {
+          "format": "text",
+          "text": "Коммерческий опыт в логистике, 4 года. Python и SQL на уровне чтения отчётов."
+        },
+        "sender_profile": {
+          "name": "Ольга",
+          "role": "рекрутер",
+          "organization": "NexTouch"
+        },
+        "context": {
+          "vacancy": "Менеджер по продажам B2B, Москва, зарплатная вилка 150–190 тыс. ₽ до вычета"
+        },
+        "constraints": {
+          "max_characters": 700,
+          "max_questions": 2
+        },
+        "goal": {
+          "instruction": "Поздороваться, представиться, назвать вакансию и предложить короткий созвон",
+          "required_points": [],
+          "forbidden_points": []
+        }
+      },
+      "expected": {
+        "compose_status": "ready",
+        "chain_status": "generated",
+        "message": "required",
+        "compose_facts_include": [
+          "логистике"
+        ],
+        "message_forbids": [
+          "11:00",
+          "в 15:30",
+          "гарантирую повышение"
+        ],
+        "ladder_calls": {
+          "compose": 1,
+          "chain": 3
+        }
+      },
+      "script": {
+        "compose": {
+          "status": "ready",
+          "key_facts": [
+            {
+              "fact": "Первый контакт: истории диалога ещё нет",
+              "evidence": {
+                "quote": "Коммерческий опыт в логистике, 4 года."
+              }
+            }
+          ],
+          "next_goal": {
+            "instruction": "Поздороваться, представиться и предложить короткий созвон",
+            "required_points": [],
+            "forbidden_points": []
+          },
+          "message": {
+            "text": "Добрый день! Меня зовут Ольга, я рекрутер NexTouch. У нас открыта позиция менеджера по продажам B2B в Москве. Посмотрела ваш профиль — коммерческий опыт в логистике выглядит релевантным. Удобно будет минут тридцать созвониться на этой неделе?",
+            "language": "ru"
+          },
+          "warnings": []
+        },
+        "state": {
+          "contact_allowed": true,
+          "do_not_contact": false,
+          "answered_questions": [],
+          "open_questions": [
+            "Есть ли у кандидата опыт с CRM?"
+          ],
+          "partner_commitments": [],
+          "conditions": [
+            "Зарплатная вилка 150–190 тыс. ₽"
+          ],
+          "last_partner_message": ""
+        },
+        "goal": {
+          "status": "goal_ready",
+          "goal": {
+            "instruction": "Поздороваться, представиться и предложить созвон",
+            "required_points": [],
+            "forbidden_points": []
+          },
+          "reason": ""
+        },
+        "message": "Добрый день! Меня зовут Ольга, я рекрутер NexTouch. У нас открыта позиция менеджера по продажам B2B. Посмотрела ваш профиль — коммерческий опыт в логистике выглядит релевантным. Удобно будет минут тридцать созвониться на этой неделе?"
+      }
+    },
+    {
+      "id": "B02",
+      "title": "Частичный ответ: часть вопросов закрыта, часть нет",
+      "kind": "partial-answer",
+      "difficulty": "simple",
+      "input": {
+        "conversation_objective": "Проверить опыт с CRM и договориться о созвоне",
+        "communication_style": {
+          "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», спокойно, коротко."
+        },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            {
+              "id": "b02-1",
+              "speaker": "sender",
+              "text": "С какими CRM-системами вы работали?"
+            },
+            {
+              "id": "b02-2",
+              "speaker": "partner",
+              "text": "Работал в amoCRM, вёл сделки и воронку."
+            },
+            {
+              "id": "b02-3",
+              "speaker": "sender",
+              "text": "Удалённый формат подходит?"
+            },
+            {
+              "id": "b02-4",
+              "speaker": "partner",
+              "text": "Да, готов работать удалённо."
+            }
+          ]
+        },
+        "partner_profile": {
+          "format": "text",
+          "text": "4 года в B2B-продажах логистических услуг."
+        },
+        "sender_profile": {
+          "name": "Ольга",
+          "role": "рекрутер",
+          "organization": "NexTouch"
+        },
+        "context": {
+          "vacancy": "Менеджер по продажам B2B, удалённо, Москва"
+        },
+        "constraints": {
+          "max_characters": 700,
+          "max_questions": 1
+        },
+        "goal": {
+          "instruction": "Уточнить среднюю нагрузку по сделкам и предложить созвон",
+          "required_points": [],
+          "forbidden_points": []
+        }
+      },
+      "expected": {
+        "compose_status": "ready",
+        "chain_status": "generated",
+        "message": "required",
+        "compose_facts_include": [
+          "amoCRM"
+        ],
+        "message_forbids": [
+          "в 14:00",
+          "в 10:00",
+          "мы уже договорились"
+        ],
+        "ladder_calls": {
+          "compose": 1,
+          "chain": 3
+        }
+      },
+      "script": {
+        "compose": {
+          "status": "ready",
+          "key_facts": [
+            {
+              "fact": "Кандидат работал в amoCRM",
+              "evidence": {
+                "quote": "Работал в amoCRM, вёл сделки и воронку.",
+                "message_id": "b02-2"
+              }
+            },
+            {
+              "fact": "Удалённый формат устраивает кандидата",
+              "evidence": {
+                "quote": "Да, готов работать удалённо.",
+                "message_id": "b02-4"
+              }
+            }
+          ],
+          "next_goal": {
+            "instruction": "Уточнить среднее число сделок в месяц и предложить созвон",
+            "required_points": [],
+            "forbidden_points": []
+          },
+          "message": {
+            "text": "Спасибо, с amoCRM понятно. Сколько сделок в среднем у вас было в месяц на прошлом месте?",
+            "language": "ru"
+          },
+          "warnings": []
+        },
+        "state": {
+          "contact_allowed": true,
+          "do_not_contact": false,
+          "answered_questions": [
+            "CRM-системы",
+            "Формат работы"
+          ],
+          "open_questions": [
+            "Средняя нагрузка по сделкам"
+          ],
+          "partner_commitments": [],
+          "conditions": [
+            "Удалённый формат"
+          ],
+          "last_partner_message": "Да, готов работать удалённо."
+        },
+        "goal": {
+          "status": "goal_ready",
+          "goal": {
+            "instruction": "Уточнить среднее число сделок в месяц",
+            "required_points": [],
+            "forbidden_points": []
+          },
+          "reason": ""
+        },
+        "message": "Спасибо, с amoCRM понятно. Сколько сделок в среднем у вас было в месяц на прошлом месте?"
+      }
+    },
+    {
+      "id": "B03",
+      "title": "Согласие на тестовое: подтверждение получено",
+      "kind": "test-accepted",
+      "difficulty": "simple",
+      "input": {
+        "conversation_objective": "Получить подтверждение готовности к тестовому заданию",
+        "communication_style": {
+          "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко."
+        },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            {
+              "id": "b03-1",
+              "speaker": "sender",
+              "text": "Пришлём тестовое задание на два часа — подходит?"
+            },
+            {
+              "id": "b03-2",
+              "speaker": "partner",
+              "text": "Да, готов выполнить тестовое задание."
+            }
+          ]
+        },
+        "partner_profile": {
+          "format": "text",
+          "text": "Опыт в продажах 4 года."
+        },
+        "sender_profile": {
+          "name": "Ольга",
+          "role": "рекрутер",
+          "organization": "NexTouch"
+        },
+        "context": {
+          "vacancy": "Менеджер по продажам B2B",
+          "test_task": "Разобрать воронку из 200 сделок"
+        },
+        "constraints": {
+          "max_characters": 600,
+          "max_questions": 1
+        },
+        "goal": {
+          "instruction": "Подтвердить договорённость и уточнить срок сдачи задания",
+          "required_points": [],
+          "forbidden_points": []
+        }
+      },
+      "expected": {
+        "compose_status": "ready",
+        "chain_status": "generated",
+        "message": "required",
+        "compose_facts_include": [
+          "тестовое"
+        ],
+        "message_forbids": [
+          "до четверга",
+          "в пятницу",
+          "к понедельнику"
+        ],
+        "ladder_calls": {
+          "compose": 1,
+          "chain": 3
+        }
+      },
+      "script": {
+        "compose": {
+          "status": "ready",
+          "key_facts": [
+            {
+              "fact": "Кандидат подтвердил готовность выполнить тестовое задание",
+              "evidence": {
+                "quote": "Да, готов выполнить тестовое задание.",
+                "message_id": "b03-2"
+              }
+            }
+          ],
+          "next_goal": {
+            "instruction": "Уточнить срок сдачи тестового задания",
+            "required_points": [],
+            "forbidden_points": []
+          },
+          "message": {
+            "text": "Спасибо! Высылаю задание на разбор воронки. Когда сможете вернуть результат?",
+            "language": "ru"
+          },
+          "warnings": []
+        },
+        "state": {
+          "contact_allowed": true,
+          "do_not_contact": false,
+          "answered_questions": [
+            "Готовность к тестовому"
+          ],
+          "open_questions": [
+            "Срок сдачи"
+          ],
+          "partner_commitments": [
+            "Выполнить тестовое задание"
+          ],
+          "conditions": [],
+          "last_partner_message": "Да, готов выполнить тестовое задание."
+        },
+        "goal": {
+          "status": "goal_ready",
+          "goal": {
+            "instruction": "Уточнить срок сдачи тестового задания",
+            "required_points": [],
+            "forbidden_points": []
+          },
+          "reason": ""
+        },
+        "message": "Спасибо! Высылаю задание на разбор воронки. Когда сможете вернуть результат?"
+      }
+    },
+    {
+      "id": "B04",
+      "title": "Отказ от тестового: дальше не продолжаем",
+      "kind": "test-declined",
+      "difficulty": "ambiguous",
+      "input": {
+        "conversation_objective": "Понять, готов ли кандидат к тестовому заданию",
+        "communication_style": {
+          "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», уважительно и коротко."
+        },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            {
+              "id": "b04-1",
+              "speaker": "sender",
+              "text": "Пришлём тестовое задание на два часа — подходит?"
+            },
+            {
+              "id": "b04-2",
+              "speaker": "partner",
+              "text": "Нет, тестовое делать не буду, у меня нет на это времени."
+            }
+          ]
+        },
+        "partner_profile": {
+          "format": "text",
+          "text": "Опыт в продажах 4 года."
+        },
+        "sender_profile": {
+          "name": "Ольга",
+          "role": "рекрутер",
+          "organization": "NexTouch"
+        },
+        "context": {
+          "vacancy": "Менеджер по продажам B2B"
+        },
+        "constraints": {
+          "max_characters": 500,
+          "max_questions": 1
+        },
+        "goal": {
+          "instruction": "Принять отказ и предложить вернуться позже",
+          "required_points": [],
+          "forbidden_points": []
+        }
+      },
+      "expected": {
+        "compose_status": "ready",
+        "chain_status": "generated",
+        "message": "required",
+        "compose_facts_include": [
+          "не буду"
+        ],
+        "message_forbids": [
+          "успеваете",
+          "успевайте",
+          "вы обязаны"
+        ],
+        "ladder_calls": {
+          "compose": 1,
+          "chain": 3
+        }
+      },
+      "script": {
+        "compose": {
+          "status": "ready",
+          "key_facts": [
+            {
+              "fact": "Кандидат отказался от тестового задания из-за нехватки времени",
+              "evidence": {
+                "quote": "Нет, тестовое делать не буду, у меня нет на это времени.",
+                "message_id": "b04-2"
+              }
+            }
+          ],
+          "next_goal": {
+            "instruction": "Принять отказ и оставить дверь открытой",
+            "required_points": [],
+            "forbidden_points": []
+          },
+          "message": {
+            "text": "Понял, спасибо, что сказали прямо. Если задание понадобится позже, просто напишите мне.",
+            "language": "ru"
+          },
+          "warnings": []
+        },
+        "state": {
+          "contact_allowed": true,
+          "do_not_contact": false,
+          "answered_questions": [
+            "Готовность к тестовому"
+          ],
+          "open_questions": [],
+          "partner_commitments": [],
+          "conditions": [
+            "Отказ от тестового"
+          ],
+          "last_partner_message": "Нет, тестовое делать не буду, у меня нет на это времени."
+        },
+        "goal": {
+          "status": "goal_ready",
+          "goal": {
+            "instruction": "Принять отказ от тестового и не давить",
+            "required_points": [],
+            "forbidden_points": []
+          },
+          "reason": ""
+        },
+        "message": "Понял, спасибо, что сказали прямо. Если задание понадобится позже, просто напишите мне."
+      }
+    },
+    {
+      "id": "B05",
+      "title": "Задание уже отправлено: ждём сдачи",
+      "kind": "awaiting-submission",
+      "difficulty": "simple",
+      "input": {
+        "conversation_objective": "Получить тестовое задание обратно",
+        "communication_style": {
+          "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко."
+        },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            {
+              "id": "b05-1",
+              "speaker": "sender",
+              "text": "Отправила задание на разбор воронки из 200 сделок."
+            },
+            {
+              "id": "b05-2",
+              "speaker": "partner",
+              "text": "Спасибо, посмотрю на выходных."
+            }
+          ]
+        },
+        "partner_profile": {
+          "format": "text",
+          "text": "Опыт в продажах 4 года."
+        },
+        "sender_profile": {
+          "name": "Ольга",
+          "role": "рекрутер",
+          "organization": "NexTouch"
+        },
+        "context": {
+          "vacancy": "Менеджер по продажам B2B"
+        },
+        "constraints": {
+          "max_characters": 500,
+          "max_questions": 1
+        },
+        "goal": {
+          "instruction": "Не дёргать кандидата, пока он сам не ответит",
+          "required_points": [],
+          "forbidden_points": []
+        }
+      },
+      "expected": {
+        "compose_status": "wait",
+        "chain_status": "wait",
+        "message": "absent",
+        "compose_facts_include": [
+          "посмотрю на выходных"
+        ],
+        "message_forbids": [
+          "задание вернули",
+          "как задание"
+        ],
+        "ladder_calls": {
+          "compose": 1,
+          "chain": 2
+        }
+      },
+      "script": {
+        "compose": {
+          "status": "wait",
+          "key_facts": [
+            {
+              "fact": "Кандидат обещал посмотреть задание на выходных",
+              "evidence": {
+                "quote": "Спасибо, посмотрю на выходных.",
+                "message_id": "b05-2"
+              }
+            }
+          ],
+          "next_goal": null,
+          "message": null,
+          "warnings": [
+            "кандидат обещал вернуться с заданием на выходных; напоминать до этого рано"
+          ]
+        },
+        "state": {
+          "contact_allowed": true,
+          "do_not_contact": false,
+          "answered_questions": [],
+          "open_questions": [
+            "Когда сдаст тестовое задание"
+          ],
+          "partner_commitments": [
+            "Посмотреть задание на выходных"
+          ],
+          "conditions": [],
+          "last_partner_message": "Спасибо, посмотрю на выходных."
+        },
+        "goal": {
+          "status": "wait",
+          "goal": null,
+          "reason": "кандидат обещал вернуться с заданием"
+        },
+        "message": null
+      }
+    },
+    {
+      "id": "B06",
+      "title": "Ожидание обещанного ответа: уточнить срок",
+      "kind": "awaiting-promised-answer",
+      "difficulty": "ambiguous",
+      "input": {
+        "conversation_objective": "Уточнить срок сдачи тестового задания",
+        "communication_style": {
+          "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», ненавязчиво."
+        },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            {
+              "id": "b06-1",
+              "speaker": "sender",
+              "text": "Когда сможете вернуть задание?"
+            },
+            {
+              "id": "b06-2",
+              "speaker": "partner",
+              "text": "Напишу в среду, как посмотрю."
+            }
+          ]
+        },
+        "partner_profile": {
+          "format": "text",
+          "text": "Опыт в продажах 4 года."
+        },
+        "sender_profile": {
+          "name": "Ольга",
+          "role": "рекрутер",
+          "organization": "NexTouch"
+        },
+        "context": {
+          "vacancy": "Менеджер по продажам B2B"
+        },
+        "constraints": {
+          "max_characters": 400,
+          "max_questions": 1
+        },
+        "goal": {
+          "instruction": "Не напоминать раньше среды",
+          "required_points": [],
+          "forbidden_points": []
+        }
+      },
+      "expected": {
+        "compose_status": "wait",
+        "chain_status": "wait",
+        "message": "absent",
+        "compose_facts_include": [
+          "в среду"
+        ],
+        "message_forbids": [
+          "напоминаю",
+          "не забыли"
+        ],
+        "ladder_calls": {
+          "compose": 1,
+          "chain": 2
+        }
+      },
+      "script": {
+        "compose": {
+          "status": "wait",
+          "key_facts": [
+            {
+              "fact": "Кандидат обещал написать в среду",
+              "evidence": {
+                "quote": "Напишу в среду, как посмотрю.",
+                "message_id": "b06-2"
+              }
+            }
+          ],
+          "next_goal": null,
+          "message": null,
+          "warnings": [
+            "кандидат сам назначил срок «в среду»; напоминание до этого дня — давление"
+          ]
+        },
+        "state": {
+          "contact_allowed": true,
+          "do_not_contact": false,
+          "answered_questions": [
+            "Срок сдачи"
+          ],
+          "open_questions": [],
+          "partner_commitments": [
+            "Написать в среду"
+          ],
+          "conditions": [
+            "Срок сдачи — среда"
+          ],
+          "last_partner_message": "Напишу в среду, как посмотрю."
+        },
+        "goal": {
+          "status": "wait",
+          "goal": null,
+          "reason": "кандидат обещал написать в среду"
+        },
+        "message": null
+      }
+    },
+    {
+      "id": "B07",
+      "title": "Договорённость о звонке: уточнить время",
+      "kind": "call-agreement",
+      "difficulty": "simple",
+      "input": {
+        "conversation_objective": "Договориться о времени созвона",
+        "communication_style": {
+          "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко."
+        },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            {
+              "id": "b07-1",
+              "speaker": "sender",
+              "text": "Давайте созвонимся на этой неделе."
+            },
+            {
+              "id": "b07-2",
+              "speaker": "partner",
+              "text": "Давайте, мне удобно после шести вечера."
+            }
+          ]
+        },
+        "partner_profile": {
+          "format": "text",
+          "text": "Опыт в продажах 4 года."
+        },
+        "sender_profile": {
+          "name": "Ольга",
+          "role": "рекрутер",
+          "organization": "NexTouch"
+        },
+        "context": {
+          "vacancy": "Менеджер по продажам B2B",
+          "available_slots": [
+            "сегодня после 18:00",
+            "завтра после 18:00"
+          ]
+        },
+        "constraints": {
+          "max_characters": 500,
+          "max_questions": 1
+        },
+        "goal": {
+          "instruction": "Предложить конкретный слот из подтверждённых",
+          "required_points": [],
+          "forbidden_points": []
+        }
+      },
+      "expected": {
+        "compose_status": "ready",
+        "chain_status": "generated",
+        "message": "required",
+        "compose_facts_include": [
+          "после шести"
+        ],
+        "message_forbids": [
+          "в 11:00",
+          "в 15:00"
+        ],
+        "ladder_calls": {
+          "compose": 1,
+          "chain": 3
+        }
+      },
+      "script": {
+        "compose": {
+          "status": "ready",
+          "key_facts": [
+            {
+              "fact": "Кандидату удобно созвон после шести вечера",
+              "evidence": {
+                "quote": "Давайте, мне удобно после шести вечера.",
+                "message_id": "b07-2"
+              }
+            },
+            {
+              "fact": "Подтверждённые слоты — сегодня или завтра после 18:00",
+              "evidence": {
+                "quote": "сегодня после 18:00"
+              }
+            }
+          ],
+          "next_goal": {
+            "instruction": "Предложить один из подтверждённых слотов после шести",
+            "required_points": [],
+            "forbidden_points": []
+          },
+          "message": {
+            "text": "Тогда удобно сегодня после 18:00? Если нет, подойдёт завтра в то же время.",
+            "language": "ru"
+          },
+          "warnings": []
+        },
+        "state": {
+          "contact_allowed": true,
+          "do_not_contact": false,
+          "answered_questions": [
+            "Нужно ли созваниваться"
+          ],
+          "open_questions": [
+            "Точное время созвона"
+          ],
+          "partner_commitments": [],
+          "conditions": [
+            "Звонок после 18:00",
+            "Слоты: сегодня/завтра после 18:00"
+          ],
+          "last_partner_message": "Давайте, мне удобно после шести вечера."
+        },
+        "goal": {
+          "status": "goal_ready",
+          "goal": {
+            "instruction": "Предложить слот после 18:00",
+            "required_points": [],
+            "forbidden_points": []
+          },
+          "reason": ""
+        },
+        "message": "Тогда удобно сегодня после 18:00? Если нет, подойдёт завтра в то же время."
+      }
+    },
+    {
+      "id": "B08",
+      "title": "Отмена прежнего ответа: кандидат передумал",
+      "kind": "correction",
+      "difficulty": "ambiguous",
+      "input": {
+        "conversation_objective": "Учесть отмену и не опираться на прежнее обещание",
+        "communication_style": {
+          "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», спокойно и коротко."
+        },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            {
+              "id": "b08-1",
+              "speaker": "sender",
+              "text": "Отправила задание, посмотрите до среды."
+            },
+            {
+              "id": "b08-2",
+              "speaker": "partner",
+              "text": "Хорошо, сделаю до среды."
+            },
+            {
+              "id": "b08-3",
+              "speaker": "partner",
+              "text": "Простите, до среды уже не успею, давайте вернёмся к этому позже."
+            }
+          ]
+        },
+        "partner_profile": {
+          "format": "text",
+          "text": "Опыт в продажах 4 года."
+        },
+        "sender_profile": {
+          "name": "Ольга",
+          "role": "рекрутер",
+          "organization": "NexTouch"
+        },
+        "context": {
+          "vacancy": "Менеджер по продажам B2B"
+        },
+        "constraints": {
+          "max_characters": 500,
+          "max_questions": 1
+        },
+        "goal": {
+          "instruction": "Принять отмену срока и не настаивать",
+          "required_points": [],
+          "forbidden_points": []
+        }
+      },
+      "expected": {
+        "compose_status": "ready",
+        "chain_status": "generated",
+        "message": "required",
+        "compose_facts_include": [
+          "не успею"
+        ],
+        "message_forbids": [
+          "успевайте до среды",
+          "до среды обязательно"
+        ],
+        "ladder_calls": {
+          "compose": 1,
+          "chain": 3
+        }
+      },
+      "script": {
+        "compose": {
+          "status": "ready",
+          "key_facts": [
+            {
+              "fact": "Кандидат отменил обещанный срок до среды",
+              "evidence": {
+                "quote": "Простите, до среды уже не успею, давайте вернёмся к этому позже.",
+                "message_id": "b08-3"
+              }
+            }
+          ],
+          "next_goal": {
+            "instruction": "Принять отмену срока и не настаивать",
+            "required_points": [],
+            "forbidden_points": []
+          },
+          "message": {
+            "text": "Хорошо, тогда срок сдвигаем. Напишите, когда будет удобно вернуться к заданию.",
+            "language": "ru"
+          },
+          "warnings": []
+        },
+        "state": {
+          "contact_allowed": true,
+          "do_not_contact": false,
+          "answered_questions": [
+            "Готовность к заданию"
+          ],
+          "open_questions": [
+            "Когда вернётся к заданию"
+          ],
+          "partner_commitments": [],
+          "conditions": [
+            "Срок до среды отменён"
+          ],
+          "last_partner_message": "Простите, до среды уже не успею, давайте вернёмся к этому позже."
+        },
+        "goal": {
+          "status": "goal_ready",
+          "goal": {
+            "instruction": "Принять отмену срока",
+            "required_points": [],
+            "forbidden_points": []
+          },
+          "reason": ""
+        },
+        "message": "Хорошо, тогда срок сдвигаем. Напишите, когда будет удобно вернуться к заданию."
+      }
+    },
+    {
+      "id": "B09",
+      "title": "Запрет контакта: писать нельзя",
+      "kind": "no-contact",
+      "difficulty": "ambiguous",
+      "input": {
+        "conversation_objective": "Не писать кандидату после его отказа",
+        "communication_style": {
+          "instructions": "Ты — рекрутер NexTouch. Обращение на «вы»."
+        },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            {
+              "id": "b09-1",
+              "speaker": "sender",
+              "text": "Напомню про задание на этой неделе."
+            },
+            {
+              "id": "b09-2",
+              "speaker": "partner",
+              "text": "Пожалуйста, не пишите мне больше, я не заинтересован."
+            }
+          ]
+        },
+        "partner_profile": {
+          "format": "text",
+          "text": "Опыт в продажах 4 года."
+        },
+        "sender_profile": {
+          "name": "Ольга",
+          "role": "рекрутер",
+          "organization": "NexTouch"
+        },
+        "context": {
+          "vacancy": "Менеджер по продажам B2B"
+        },
+        "constraints": {
+          "max_characters": 400,
+          "max_questions": 0
+        },
+        "goal": {
+          "instruction": "Уважить запрет контакта",
+          "required_points": [],
+          "forbidden_points": []
+        }
+      },
+      "expected": {
+        "compose_status": "do_not_contact",
+        "chain_status": "do_not_contact",
+        "message": "absent",
+        "message_forbids": [
+          "если передумаете"
+        ],
+        "ladder_calls": {
+          "compose": 0,
+          "chain": 1
+        }
+      },
+      "script": {
+        "compose": {
+          "status": "do_not_contact",
+          "key_facts": [],
+          "next_goal": null,
+          "message": null,
+          "warnings": [
+            "собеседник просил не писать"
+          ]
+        },
+        "state": {
+          "contact_allowed": false,
+          "do_not_contact": true,
+          "answered_questions": [],
+          "open_questions": [],
+          "partner_commitments": [],
+          "conditions": [
+            "Запрет контакта"
+          ],
+          "last_partner_message": "Пожалуйста, не пишите мне больше, я не заинтересован."
+        },
+        "goal": {
+          "status": "do_not_contact",
+          "goal": null,
+          "reason": "запрет контакта в состоянии"
+        },
+        "message": null
+      }
+    },
+    {
+      "id": "B10",
+      "title": "Недостаточно данных: подробностей о клиенте нет",
+      "kind": "insufficient-context",
+      "difficulty": "ambiguous",
+      "input": {
+        "conversation_objective": "Обсудить кейсы кандидата",
+        "communication_style": {
+          "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко."
+        },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            {
+              "id": "b10-1",
+              "speaker": "partner",
+              "text": "Хотел бы подробнее понять, как у вас устроена работа с клиентами."
+            }
+          ]
+        },
+        "partner_profile": {
+          "format": "text",
+          "text": "Опыт в продажах 4 года."
+        },
+        "sender_profile": {
+          "name": "Ольга",
+          "role": "рекрутер",
+          "organization": "NexTouch"
+        },
+        "context": {
+          "vacancy": "Менеджер по продажам B2B"
+        },
+        "constraints": {
+          "max_characters": 600,
+          "max_questions": 1
+        },
+        "goal": {
+          "instruction": "Ответить по устройству работы с клиентами",
+          "required_points": [],
+          "forbidden_points": []
+        }
+      },
+      "expected": {
+        "compose_status": [
+          "cannot_compose",
+          "ready"
+        ],
+        "chain_status": "generated",
+        "message": "any",
+        "message_forbids": [
+          "сначала квалификация"
+        ],
+        "ladder_calls": {
+          "compose": 1,
+          "chain": 3
+        }
+      },
+      "script": {
+        "compose": {
+          "status": "cannot_compose",
+          "key_facts": [],
+          "next_goal": null,
+          "message": null,
+          "warnings": [
+            "в переданном контексте нет подтверждённых данных о процессе работы с клиентами"
+          ]
+        },
+        "state": {
+          "contact_allowed": true,
+          "do_not_contact": false,
+          "answered_questions": [],
+          "open_questions": [
+            "Как устроена работа с клиентами"
+          ],
+          "partner_commitments": [],
+          "conditions": [],
+          "last_partner_message": "Хотел бы подробнее понять, как у вас устроена работа с клиентами."
+        },
+        "goal": {
+          "status": "goal_ready",
+          "goal": {
+            "instruction": "Ответить по устройству работы с клиентами",
+            "required_points": [],
+            "forbidden_points": []
+          },
+          "reason": ""
+        },
+        "message": "Добрый день! Расскажите подробнее, что именно в устройстве работы с клиентами вам непонятно — отвечу по существу."
+      }
+    },
+    {
+      "id": "B11",
+      "title": "Новый входящий ответ после старого черновика",
+      "kind": "fresh-answer",
+      "difficulty": "ambiguous",
+      "input": {
+        "conversation_objective": "Учесть свежий ответ кандидата и не переспрашивать закрытое",
+        "communication_style": {
+          "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко."
+        },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            {
+              "id": "b11-1",
+              "speaker": "sender",
+              "text": "С какими CRM работали?"
+            },
+            {
+              "id": "b11-2",
+              "speaker": "partner",
+              "text": "Работал в amoCRM и в Bitrix24, вёл воронку и отчётность."
+            },
+            {
+              "id": "b11-3",
+              "speaker": "partner",
+              "text": "Добавлю: последние полгода вёл самописную интеграцию с 1С."
+            }
+          ]
+        },
+        "partner_profile": {
+          "format": "text",
+          "text": "Опыт в продажах 4 года, последние полгода — техлид интеграций."
+        },
+        "sender_profile": {
+          "name": "Ольга",
+          "role": "рекрутер",
+          "organization": "NexTouch"
+        },
+        "context": {
+          "vacancy": "Технический лидер продаж, Москва"
+        },
+        "constraints": {
+          "max_characters": 700,
+          "max_questions": 1
+        },
+        "goal": {
+          "instruction": "Не переспрашивать CRM, уточнить про самописную интеграцию",
+          "required_points": [],
+          "forbidden_points": []
+        }
+      },
+      "expected": {
+        "compose_status": "ready",
+        "chain_status": "generated",
+        "message": "required",
+        "compose_facts_include": [
+          "Bitrix24"
+        ],
+        "message_forbids": [
+          "С какими CRM",
+          "какими CRM-системами вы работали"
+        ],
+        "ladder_calls": {
+          "compose": 1,
+          "chain": 3
+        }
+      },
+      "script": {
+        "compose": {
+          "status": "ready",
+          "key_facts": [
+            {
+              "fact": "Кандидат работал в amoCRM и Bitrix24",
+              "evidence": {
+                "quote": "Работал в amoCRM и в Bitrix24, вёл воронку и отчётность.",
+                "message_id": "b11-2"
+              }
+            },
+            {
+              "fact": "Последние полгода кандидат вёл самописную интеграцию с 1С",
+              "evidence": {
+                "quote": "Добавлю: последние полгода вёл самописную интеграцию с 1С.",
+                "message_id": "b11-3"
+              }
+            }
+          ],
+          "next_goal": {
+            "instruction": "Уточнить, как устроена самописная интеграция с 1С",
+            "required_points": [],
+            "forbidden_points": []
+          },
+          "message": {
+            "text": "С CRM всё понятно. Расскажите, на чём написана эта интеграция с 1С и кто её поддерживает?",
+            "language": "ru"
+          },
+          "warnings": []
+        },
+        "state": {
+          "contact_allowed": true,
+          "do_not_contact": false,
+          "answered_questions": [
+            "CRM-системы"
+          ],
+          "open_questions": [
+            "Как устроена интеграция с 1С"
+          ],
+          "partner_commitments": [],
+          "conditions": [
+            "Самописная интеграция с 1С"
+          ],
+          "last_partner_message": "Добавлю: последние полгода вёл самописную интеграцию с 1С."
+        },
+        "goal": {
+          "status": "goal_ready",
+          "goal": {
+            "instruction": "Уточнить самописную интеграцию с 1С",
+            "required_points": [],
+            "forbidden_points": []
+          },
+          "reason": ""
+        },
+        "message": "С CRM всё понятно. Расскажите, на чём написана эта интеграция с 1С и кто её поддерживает?"
+      }
+    },
+    {
+      "id": "B12",
+      "title": "Кандидат просит перенести: обещанного срока нет",
+      "kind": "unconfirmed-deadline",
+      "difficulty": "simple",
+      "input": {
+        "conversation_objective": "Согласовать срок сдачи задания",
+        "communication_style": {
+          "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко."
+        },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            {
+              "id": "b12-1",
+              "speaker": "sender",
+              "text": "Когда сможете вернуть задание?"
+            }
+          ]
+        },
+        "partner_profile": {
+          "format": "text",
+          "text": "Опыт в продажах 4 года."
+        },
+        "sender_profile": {
+          "name": "Ольга",
+          "role": "рекрутер",
+          "organization": "NexTouch"
+        },
+        "context": {
+          "vacancy": "Менеджер по продажам B2B"
+        },
+        "constraints": {
+          "max_characters": 400,
+          "max_questions": 1
+        },
+        "goal": {
+          "instruction": "Не выдумывать срок, которого никто не называл",
+          "required_points": [],
+          "forbidden_points": []
+        }
+      },
+      "expected": {
+        "compose_status": "ready",
+        "chain_status": "generated",
+        "message": "required",
+        "message_forbids": [
+          "в 18:00",
+          "до пятницы",
+          "в четверг"
+        ],
+        "ladder_calls": {
+          "compose": 1,
+          "chain": 3
+        }
+      },
+      "script": {
+        "compose": {
+          "status": "ready",
+          "key_facts": [
+            {
+              "fact": "Кандидат ещё не назвал срок сдачи задания",
+              "evidence": {
+                "quote": "Когда сможете вернуть задание?",
+                "message_id": "b12-1"
+              }
+            }
+          ],
+          "next_goal": {
+            "instruction": "Уточнить срок сдачи, не предлагая конкретную дату",
+            "required_points": [],
+            "forbidden_points": []
+          },
+          "message": {
+            "text": "Подскажите, когда вам удобно вернуть задание — я подстрою остальные шаги.",
+            "language": "ru"
+          },
+          "warnings": []
+        },
+        "state": {
+          "contact_allowed": true,
+          "do_not_contact": false,
+          "answered_questions": [],
+          "open_questions": [
+            "Когда сдаст задание"
+          ],
+          "partner_commitments": [],
+          "conditions": [],
+          "last_partner_message": ""
+        },
+        "goal": {
+          "status": "goal_ready",
+          "goal": {
+            "instruction": "Уточнить срок сдачи задания",
+            "required_points": [],
+            "forbidden_points": []
+          },
+          "reason": ""
+        },
+        "message": "Подскажите, когда вам удобно вернуть задание — я подстрою остальные шаги."
+      }
+    }
+  ]
+}
