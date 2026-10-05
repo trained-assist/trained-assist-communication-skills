@@ -1,6 +1,8 @@
 'use strict';
 import { TypedError } from './typed-error.mjs';
-export const METHOD_TOTAL_BUDGET_MS = 60000;
+// Allow the shared ladder to move past a slow/temporarily unavailable rung while
+// keeping one bounded deadline for the complete Communication operation.
+export const METHOD_TOTAL_BUDGET_MS = 120000;
 // All validation/guard repair attempts share the same method deadline. Provider
 // fallbacks remain owned by the shared ladder; this adds no independent retries.
 export function remainingMethodBudget(started, attempts = 0) {
