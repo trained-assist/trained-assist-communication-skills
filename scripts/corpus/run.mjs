@@ -259,6 +259,17 @@ function summarise(results, mode, skipped = 0) {
   const liveViolations = liveState.filter((r) => r.requiresLiveFacts && r.decision !== NO_MATCHING_OPTION);
   const lostConstraints = results.reduce((sum, r) => sum + r.lostConstraints, 0);
   const costs = results.map((r) => r.cost).filter((v) => v !== null);
+  const falseFast = results.filter((r) => r.falseFast);
+
+  const quality = {
+    decision_accuracy: decisions.length ? accepted.length / decisions.length : null,
+    goal_completeness: results.length
+      ? results.reduce((sum, r) => sum + r.goalChecks, 0) / Math.max(1, results.reduce((sum, r) => sum + r.goalChecksTotal, 0))
+      : null,
+    no_matching_share: decisions.length ? reserved.length / decisions.length : null,
+    lost_constraints: lostConstraints,
+    live_state_violations: liveViolations.length,
+  };
 
   return {
     mode,
@@ -266,17 +277,20 @@ function summarise(results, mode, skipped = 0) {
     skipped_offline_only: skipped,
     passed: results.filter((r) => r.problems.length === 0).length,
     failed: results.filter((r) => r.problems.length > 0).length,
-    // Ниже — метрики качества. В офлайн-режиме они описывают КОНТРАКТ (цель приходит
-    // из скрипта), поэтому помечены как contract_*, а не как измерение модели.
+    // Ниже — метрики качества. В офлайне они описывают КОНТРАКТ (цель приходит
+    // из скрипта), поэтому печатаются с префиксом contract_*, а не как измерение
+    // модели. Один и тот же набор чисел с двумя разными именами в двух режимах —
+    // это ровно та подмена, ради которой офлайн-режим и помечен.
+    ...(mode === 'offline'
+      ? Object.fromEntries(Object.entries(quality).map(([k, v]) => [`contract_${k}`, v]))
+      : quality),
+    // ЛОЖНО-БЫСТРЫЙ ОТВЕТ — отдельный класс, а не подвид accuracy: быстрый вариант
+    // выбран там, где задача должна была уйти в agent, и часть просьбы потеряна
+    // молча. Считается по разметке `false_fast_if`, а не heuristically.
+    false_fast: falseFast.length,
+    false_fast_cases: falseFast.map((r) => r.id),
     infra_failures: infra.length,
     infra_codes: [...new Set(infra.map((r) => r.error_code))],
-    contract_decision_accuracy: decisions.length ? accepted.length / decisions.length : null,
-    contract_goal_completeness: results.length
-      ? results.reduce((sum, r) => sum + r.goalChecks, 0) / Math.max(1, results.reduce((sum, r) => sum + r.goalChecksTotal, 0))
-      : null,
-    contract_no_matching_share: decisions.length ? reserved.length / decisions.length : null,
-    contract_lost_constraints: lostConstraints,
-    contract_live_state_violations: liveViolations.length,
     max_ladder_calls: results.reduce((max, r) => Math.max(max, r.ladderCalls), 0),
     p50_ms: percentile(latencies, 50),
     p95_ms: percentile(latencies, 95),
@@ -302,11 +316,18 @@ function isOfflineOnly(c) {
  * @param {'offline'|'live'} o.mode
  * @param {object} o.env Worker env (в live-режиме нужны LLM_LADDER_URL/TOKEN)
  * @param {Array<string>} [o.only] фильтр по id кейсов
+ * @param {Array<string>} [o.catalog] фильтр по каталогу решений
  * @param {boolean} [o.verbose]
  */
-export async function runCorpus({ mode = 'offline', env: envArg = {}, only = null, verbose = false } = {}) {
+export async function runCorpus({ mode = 'offline', env: envArg = {}, only = null, catalog = null, verbose = false } = {}) {
   const fixtures = JSON.parse(readFileSync(CASES_PATH, 'utf8'));
-  const selected = only ? fixtures.cases.filter((c) => only.includes(c.id)) : fixtures.cases;
+  let selected = only ? fixtures.cases.filter((c) => only.includes(c.id)) : fixtures.cases;
+  // Фильтр по каталогу — для приёмки у потребителя: «прогони МОЙ список решений»
+  // не должно означать «перепиши 25 id в командной строке».
+  if (catalog) {
+    const wanted = new Set([].concat(catalog));
+    selected = selected.filter((c) => wanted.has(c.catalog));
+  }
   const cases = mode === 'live' ? selected.filter((c) => !isOfflineOnly(c)) : selected;
   const skipped = selected.length - cases.length;
   const state = { calls: [], current: null, prompts: [] };
@@ -344,6 +365,7 @@ export async function runCorpus({ mode = 'offline', env: envArg = {}, only = nul
       ladderCalls: state.calls.length,
       decision: out.data?.decision ?? null,
       accepted: !out.isError && (exp.accepts || [exp.decision]).includes(out.data.decision),
+      falseFast: !out.isError && Array.isArray(exp.false_fast_if) && exp.false_fast_if.includes(out.data.decision),
       liveState: !!exp.live_state,
       requiresLiveFacts: !!exp.requires_live_facts,
       goalChecks,
@@ -375,6 +397,16 @@ function main() {
   const verbose = argv.includes('--verbose') || argv.includes('-v');
   const onlyIdx = argv.indexOf('--only');
   const only = onlyIdx >= 0 ? argv[onlyIdx + 1].split(',').filter(Boolean) : null;
+  const catalogIdx = argv.indexOf('--catalog');
+  const catalog = catalogIdx >= 0 ? argv[catalogIdx + 1].split(',').filter(Boolean) : null;
+  if (only && onlyIdx + 1 >= argv.length) {
+    console.error('--only требует список id через запятую.');
+    process.exit(2);
+  }
+  if (catalog && catalogIdx + 1 >= argv.length) {
+    console.error('--catalog требует имя каталога решений (например integration-v1).');
+    process.exit(2);
+  }
 
   if (mode === 'live' && (!process.env.LLM_LADDER_URL || !process.env.LLM_LADDER_TOKEN)) {
     console.error('live-режим требует LLM_LADDER_URL и LLM_LADDER_TOKEN (секреты общей лестницы).');
@@ -382,24 +414,47 @@ function main() {
     process.exit(2);
   }
 
-  runCorpus({ mode, env: process.env, only, verbose })
+  runCorpus({ mode, env: process.env, only, catalog, verbose })
     .then(({ results, metrics }) => {
       console.log(`\nКОРПУС resolve_user_intent — режим ${mode}`);
+      if (catalog) console.log(`Каталог решений: ${catalog.join(', ')}.`);
       if (mode === 'offline') {
         console.log('Лестница подменена скриптом: метрики ниже описывают КОНТРАКТ, а не качество модели.');
         console.log('Замер качества — только --live с секретами общей лестницы.');
-      } else if (metrics.skipped_offline_only) {
+      } else {
+        console.log('Живая лестница: метрики ниже — измерение модели, а не утверждение о конвейере.');
+      }
+      if (mode === 'live' && metrics.skipped_offline_only) {
         console.log(`Пропущено ${metrics.skipped_offline_only} контрактных кейсов (подсованный guard'у дефект, ожидаемый код ошибки, запрет на вызов лестницы): в live их некому подсовывать — отвечает модель. Их проверяет офлайн-прогон.`);
       }
       for (const r of results.filter((x) => x.problems.length)) {
-        console.log(`  ✗ ${r.id} — ${r.title}\n      → ${r.problems.join(' · ')}`);
+        const mark = r.falseFast ? ' · ЛОЖНО-БЫСТРЫЙ' : '';
+        console.log(`  ✗ ${r.id} — ${r.title}${mark}\n      → выбрано ${r.decision} (метка ${(r.accepted ? 'верно' : 'расходится')})\n      → ${r.problems.join(' · ')}`);
       }
+      if (metrics.false_fast) {
+        console.log(`\nЛОЖНО-БЫСТРЫЕ ОТВЕТЫ (${metrics.false_fast}): ${metrics.false_fast_cases.join(', ')}`);
+        console.log('Быстрый вариант выбран там, где задача должна была уйти в agent: часть просьбы потеряна молча.');
+      }
+      if (metrics.infra_failures) {
+        // В офлайне это НЕ сбои лестницы, а намеренно подложенные контрактные
+        // кейсы (недоступная лестница, отклонение guard'ом, невалидный вход): их
+        // метрика зовёт их infra_failures по той же причине, что и настоящие
+        // технические сбои, — они выпадают из знаменателя accuracy.
+        console.log(mode === 'offline'
+          ? `\nКонтрактных кейсов, выпадающих из знаменателя accuracy (${metrics.infra_failures}): ${metrics.infra_codes.join(', ')}. В офлайне это подложенные дефекты и ожидаемые коды ошибок, а не сбои.`
+          : `\nТехнические сбои лестницы (${metrics.infra_failures}): ${metrics.infra_codes.join(', ')}. Это доступность воркера, а не качество метода — такие кейсы выпадают из знаменателя accuracy.`);
+      }
+
       console.log('\nМЕТРИКИ');
       for (const [k, v] of Object.entries(metrics)) {
+        if (Array.isArray(v)) { if (v.length) console.log(`  ${k}: ${v.join(', ')}`); continue; }
         console.log(`  ${k}: ${v === null ? 'n/a' : (typeof v === 'number' && v % 1 !== 0 ? v.toFixed(4) : v)}`);
       }
       const failed = metrics.failed;
       console.log(`\nИТОГ: ${metrics.passed}/${metrics.cases} кейсов зелёные${failed ? `, ${failed} красные — разбираться` : ''}.`);
+      if (mode === 'offline') {
+        console.log('Зелёный офлайн-прогон НЕ означает, что модель выбирает правильно: качество — только --live.');
+      }
       process.exit(failed ? 1 : 0);
     })
     .catch((e) => { console.error('corpus runner crashed:', e); process.exit(2); });

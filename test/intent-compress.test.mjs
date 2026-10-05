@@ -27,6 +27,39 @@ function longText({ middle = [], last = 'И заодно найди ваканс
   return [FILLER, ...Array.from({ length: 30 }, () => FILLER), ...middle, last].join(' ');
 }
 
+test('длинное несжимаемое событие попадает в отчёт и в warning, а не проходит молча', () => {
+  // Простыня без точек и переводов строк: разрезать нечем, и метод не имеет права
+  // резать. Но раньше он уходил к классификатору ЦЕЛИКОМ и при этом рапортовал
+  // events_compressed: 0 без единого warning — метрика утверждала «вход уместился».
+  const sheet = `${'Коллеги '.repeat(6000).trim()} Собери отчёт, но пока не отправляй`;
+  const r = compressEventText(sheet);
+  assert.equal(r.compressed, false);
+  assert.equal(r.report.unsplittable, true);
+  assert.equal(r.report.chars_after, sheet.length, 'несжимаемый текст не должен укорачиваться');
+
+  const { input: out, reports } = compressIntentInput({
+    input_bundle: { id: 'b', events: [{ id: 'e1', type: 'text', author: 'user', text: sheet }] },
+  });
+  assert.equal(reports.length, 1, 'попытка сжатия обязана попасть в отчёт');
+  assert.equal(reports[0].event_id, 'e1');
+  assert.equal(reports[0].unsplittable, true);
+  assert.equal(out.input_bundle.events[0].text, sheet, 'текст события не должен меняться');
+  const m = compressionMetrics(reports);
+  assert.equal(m.events_compressed, 1);
+  assert.equal(m.sentences_dropped, 0, 'ничего не выброшено — и это обязано быть видно');
+  const w = compressionWarnings(reports);
+  assert.deepEqual(w.map((x) => x.code), ['input_uncompressible']);
+  assert.equal(w[0].chars_after, w[0].chars_before);
+});
+
+test('обычное сжатие и несжимаемое событие различаются в warning', () => {
+  const filler = Array.from({ length: 3000 }, (_, i) => `Обсуждали пункт ${i + 1} в общем чате.`).join(' ');
+  const r = compressEventText(filler);
+  assert.equal(r.compressed, true);
+  const { reports } = compressIntentInput({ input_bundle: { id: 'b', events: [{ id: 'e1', type: 'text', author: 'user', text: filler }] } });
+  assert.deepEqual(compressionWarnings(reports).map((x) => x.code), ['input_compressed']);
+});
+
 test('короткий текст не трогается вообще', () => {
   const text = 'Подбери вакансии по резюме. Пока не откликайся.';
   const r = compressEventText(text);

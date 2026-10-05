@@ -35,12 +35,77 @@ const DATE_WORD_RE = /(?<![\p{L}\p{N}])(?:послезавтра|сегодня|
 // read. Distinct from a legitimate goal about the file («переведи PDF»).
 const SOURCE_CLAIM_RE = /(?<![\p{L}\p{N}])(?:в файле|в документе|в письме|в приложении|в резюме|в переписке|в сообщении|файл содержит|документ содержит|на картинке|в скриншоте|в аудио|в записи)(?![\p{L}\p{N}])/giu;
 
+// ПРАВИЛО 4 НЕ ДОЛЖЕН НАКАЗЫВАТЬ ЗА ПРАВДУ. Промпт прямо велит сказать, что
+// содержимое не передано («Не выдумывай содержимое файла по его имени»), а guard
+// отклонял ровно такой ответ: «в документе прочитать нечего» попадало под
+// SOURCE_CLAIM_RE, и корректная формулировка стоила двух оплаченных вызовов и
+// INTENT_REJECTED. Для control plane это не абстрактная потеря: вложения приходят
+// всегда как `content_status: 'metadata_only'` без текста (CP #43,
+// src/router/communication-v1.ts), то есть этот путь — основной, а не редкий.
+//
+// Исключение узкое, до запятой: утверждение об ОТСУТСТВИИ содержимого снимает
+// претензию только в своей части предложения. «В документе указано 50 сделок, но
+// прочитать не удалось» — части разные, и в первой маркера нет, поэтому выдумка
+// по-прежнему отклоняется.
+const UNAVAILABLE_STATEMENT_RE = /(?<![\p{L}\p{N}])(?:нечего\s+(?:читать|разбирать|смотреть|открывать|извлекать)|нет\s+(?:текста|содержимого|данных|файла|документа|приложения|вложения)|не\s*(?:прочитан|прочитать|извлеч[её]н|извлечь|распознан|распознать|известен|доступен|открыт|видно|содержимое)|недоступн\w*|неизвестн\w*|без\s+текста|не\s+(?:получилось|удалось)\s+(?:прочитать|открыть|извлечь|распознать)|только\s+манифест|прочитать\s+нечего)(?![\p{L}\p{N}])/iu;
+
+// Догадка вместо прочитанного. Наличие такого маркера в цели означает, что
+// содержимое всё-таки «достроено», и проверка отсутствия содержимого остаётся в
+// силе независимо от маркера непрочитанности рядом.
+const UNSUPPORTED_INFERENCE_RE = /(?<![\p{L}\p{N}])(?:предполага\w*|похоже|вероятно|наверное|должно\s+быть|скорее\s+всего|видимо|я\s+думаю|догад\w*|кажется)(?![\p{L}\p{N}])/iu;
+
+// Границы частей предложения для проверки «своей части». Запятая, точка с запятой,
+// двоеточие, скобки и тире — всё, после чего «прочитать нечего» уже не относится
+// к тому, о чём сказано в предыдущей части.
+const CLAUSE_SPLIT_RE = /[,;:()[\]{}«»—–]/u;
+
+/** Часть предложения, в которой встретилось утверждение о содержимом. */
+function clauseAt(text, at) {
+  let start = 0;
+  for (let i = 0; i < at; i += 1) if (CLAUSE_SPLIT_RE.test(text[i])) start = i + 1;
+  let end = text.length;
+  for (let i = at; i < text.length; i += 1) if (CLAUSE_SPLIT_RE.test(text[i])) { end = i; break; }
+  return text.slice(start, end);
+}
+
+/**
+ * Does this content claim actually assert content, or does it report that the
+ * content is unavailable? Deterministic, no semantics: EVERY occurrence of the
+ * claim has to sit in a clause that states unavailability, and no inference
+ * marker may appear in the goal. Checking only the first occurrence would let
+ * «В файле ничего нет, а в файле указано 50 сделок» пройти.
+ *
+ * @param {string} goal user_goal as written
+ * @param {string} claim the matched SOURCE_CLAIM_RE substring
+ * @returns {boolean} true = the claim is standing (fabrication), false = it reports absence
+ */
+export function assertsUnreadContent(goal, claim) {
+  if (UNSUPPORTED_INFERENCE_RE.test(goal)) return true;
+  const text = String(goal ?? '');
+  const needle = String(claim ?? '').toLowerCase();
+  if (!needle) return true;
+  let at = text.toLowerCase().indexOf(needle);
+  if (at < 0) return true;
+  do {
+    if (!UNAVAILABLE_STATEMENT_RE.test(clauseAt(text, at))) return true;
+    at = text.toLowerCase().indexOf(needle, at + needle.length);
+  } while (at >= 0);
+  return false;
+}
+
 /** Everything the caller actually gave us — the only admissible source of facts. */
 export function confirmedEvidence(input) {
   const parts = [];
   for (const e of input?.input_bundle?.events || []) parts.push(e.text || '');
   for (const a of input?.input_bundle?.attachments || []) parts.push(a.text || '', a.name || '');
   for (const h of input?.dialog_context?.history || []) parts.push(h.text || '');
+  // Активные задачи — тоже переданный вызывающей стороной текст, и промпт их
+  // отрисовывает дословно («Активные задачи»). Без них «продолжай» не имеет
+  // предмета: модель обязана назвать цель активной задачи, а guard отвечал, что
+  // такой цели во входе нет, и отклонял корректное продолжение как выдумку
+  // (воспроизведено: задача «Подготовить отчёт по продажам за 09.2025» → INTENT_REJECTED,
+  // тот же текст в history → ok). Ровно эта асимметрия и была дефектом.
+  for (const t of input?.dialog_context?.active_tasks || []) parts.push(t.goal || '', t.expected_answer || '', t.id || '');
   for (const f of input?.runtime_facts || []) parts.push(f.value || '', f.as_of || '');
   for (const c of input?.capabilities || []) parts.push(c.description || '');
   for (const o of input?.decision_options || []) parts.push(o.description || '', o.applicability || '');
@@ -105,7 +170,8 @@ export function runIntentGuard({ input, output, allowedIds }) {
   // 4. no claims about content we were never given
   const unreadable = (input?.input_bundle?.attachments || []).filter((a) => !a.text?.trim());
   if (unreadable.length) {
-    const claims = unmatchedClaims(goal, evidence, SOURCE_CLAIM_RE);
+    const claims = unmatchedClaims(goal, evidence, SOURCE_CLAIM_RE)
+      .filter((claim) => assertsUnreadContent(goal, claim));
     if (claims.length) {
       return {
         verdict: 'unavailable_source',

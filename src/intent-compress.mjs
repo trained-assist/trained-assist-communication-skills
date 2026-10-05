@@ -219,7 +219,21 @@ export function compressIntentInput(input, opts = {}) {
     if (!e || typeof e.text !== 'string') return e;
     if (e.author !== 'user') return e;
     const { text, compressed, report } = compressEventText(e.text, opts);
-    if (!compressed) return e;
+    if (!compressed) {
+      // «Не сжалось» и «сжимать было нечего» — разные вещи, а отчёт обязан их
+      // различать. Событие длиннее порога, которое splitSentences не смогло
+      // разрезать (простыня без точек и переводов строк), уходит к классификатору
+      // ЦЕЛИКОМ: восемьдесят тысяч символов вместо двух, при maxTokens 400 на
+      // ответ. Раньше это выглядело как «вход уместился» — events_compressed: 0 и
+      // ни одного warning, то есть метрика врала в обе стороны. Теперь такая
+      // попытка попадает в отчёт и в warning: метод не обрезает молча, и вызывающая
+      // сторона видит, что ей надо разбить пакет у себя.
+      if (report.unsplittable) {
+        changed += 1;
+        reports.push({ event_id: e.id, ...report });
+      }
+      return e;
+    }
     changed += 1;
     reports.push({ event_id: e.id, ...report });
     return { ...e, text };
@@ -254,9 +268,12 @@ export function compressionMetrics(reports) {
  */
 export function compressionWarnings(reports) {
   return reports
-    .filter((r) => r.sentences_dropped > 0)
+    .filter((r) => r.sentences_dropped > 0 || r.unsplittable)
     .map((r) => ({
-      code: 'input_compressed',
+      // Два разных события, поэтому два разных кода: `input_compressed` — часть
+      // предложений не дошла до классификатора, `input_uncompressible` — не дошла
+      // вся граница события, и метод не имел права её резать.
+      code: r.unsplittable ? 'input_uncompressible' : 'input_compressed',
       event: r.event_id,
       sentences_total: r.sentences_total,
       sentences_kept: r.sentences_kept,
