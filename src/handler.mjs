@@ -517,6 +517,7 @@ export async function generateNextMessage(raw, env = {}) {
           temperature: profile.temperature,
           maxTokens: profile.maxTokens,
           totalTimeoutMs: remainingMethodBudget(t0, attempt - 1),
+          traceId: raw?.trace_id || requestId,
         });
       } catch (e) {
         if (e instanceof LadderError) {

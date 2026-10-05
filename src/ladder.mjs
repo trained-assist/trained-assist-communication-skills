@@ -37,10 +37,11 @@ export async function ladderChat({
   messages,
   temperature = 0.7,
   maxTokens = 800,
-  timeoutMs = 20000,
+  timeoutMs = 60000,
   totalTimeoutMs = 60000,
   app = 'communication-skills',
   responseFormat = null,
+  traceId = null,
 } = {}) {
   if (!Number.isFinite(totalTimeoutMs) || totalTimeoutMs <= 0) throw new LadderError('ladderChat: invalid total timeout budget');
   totalTimeoutMs = Math.floor(totalTimeoutMs);
@@ -52,7 +53,9 @@ export async function ladderChat({
     messages,
     temperature,
     max_tokens: maxTokens,
-    ladder_timeout_ms: timeoutMs,
+    // Full state extraction can take 38s on the configured rung. A 20s rung
+    // limit discarded that work twice; give it the remaining method deadline.
+    ladder_timeout_ms: Math.min(timeoutMs, totalTimeoutMs),
     ladder_total_timeout_ms: totalTimeoutMs,
   };
   if (responseFormat) body.response_format = responseFormat;
@@ -65,6 +68,7 @@ export async function ladderChat({
         Authorization: `Bearer ${token || 'missing-token'}`,
         'Content-Type': 'application/json',
         'x-ladder-app': app,
+        ...(traceId ? { 'x-ladder-trace': String(traceId) } : {}),
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(totalTimeoutMs + 5000),
