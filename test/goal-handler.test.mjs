@@ -37,6 +37,7 @@ test('formulates an open-ended goal, permits missing reason, and echoes revision
     assert.equal(result.data.status, 'goal_ready');
     assert.equal(result.data.requires_message, true);
     assert.deepEqual(result.data.goal, { instruction: 'Уточнить, с какими CRM кандидат работал и какие задачи в них выполнял', required_points: [], forbidden_points: [] });
+    assert.equal(stub.calls[0].reasoning_effort, 'low');
     assert.equal(result.data.reason, '');
     assert.equal(result.data.conversation_revision, 'history-v9');
     assert.deepEqual(stub.calls[0].response_format.json_schema.schema.properties.status.enum, ['goal_ready', 'wait', 'no_matching_option']);

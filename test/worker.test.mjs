@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import worker from '../src/index.mjs';
 
 const TOKEN = 'test-token-abc';
-const ENV = { COMMUNICATION_TOKEN: TOKEN, LLM_LADDER_URL: 'http://127.0.0.1:1/nope', LLM_LADDER_TOKEN: 'x' };
+const ENV = { COMMUNICATION_TOKEN: TOKEN, LLM_LADDER_URL: 'http://127.0.0.1:1/nope', LLM_LADDER_TOKEN: 'x', BUILD_SHA: 'fixture-build' };
 
 const authed = (extra = {}) => ({ Authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json', ...extra });
 
@@ -31,6 +31,7 @@ test('GET /health — публичный, без токена, и честно �
   const body = await res.json();
   assert.equal(body.status, 'ready');
   assert.equal(body.ladder_configured, true);
+  assert.equal(body.build, 'fixture-build');
   assert.ok(body.contract_version);
 });
 
