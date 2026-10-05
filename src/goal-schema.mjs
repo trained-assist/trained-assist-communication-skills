@@ -2,6 +2,22 @@
 
 export const GOAL_STATUSES = Object.freeze(['goal_ready', 'wait', 'no_matching_option']);
 
+function executionSchema(materialBindings = null) {
+  const variants = [
+    { type: 'null' },
+    { type: 'object', additionalProperties: false, required: ['type'], properties: { type: { type: 'string', enum: ['write_message'] } } },
+  ];
+  if (materialBindings === null || materialBindings.length) variants.push({
+    type: 'object', additionalProperties: false, required: ['type', 'stage_id'],
+    properties: {
+      type: { type: 'string', enum: ['send_material'] },
+      stage_id: { type: 'string', minLength: 1, ...(materialBindings ? { enum: materialBindings.map(binding => binding.stage_id) } : {}) },
+      resend_requested: { type: 'boolean' },
+    },
+  });
+  return { anyOf: variants };
+}
+
 export function buildGoalDecisionSchema(materialBindings = null) {
   return {
     type: 'object',
@@ -10,7 +26,7 @@ export function buildGoalDecisionSchema(materialBindings = null) {
     properties: {
       status: { type: 'string', enum: [...GOAL_STATUSES] },
       goal: {
-        type: 'object',
+        type: ['object', 'null'],
         additionalProperties: false,
         required: ['instruction'],
         properties: {
@@ -19,15 +35,15 @@ export function buildGoalDecisionSchema(materialBindings = null) {
           forbidden_points: { type: 'array', description: 'Prohibitions for the writer. Actions belong in instruction, confirmed facts in required_points.', items: { type: 'string' } },
         },
       },
-      ...(materialBindings ? { execution: {
-        type: ['object', 'null'], additionalProperties: false,
-        required: ['type'], properties: {
-          type: { type: 'string', enum: materialBindings.length ? ['write_message', 'send_material'] : ['write_message'] },
-          ...(materialBindings.length ? { stage_id: { type: 'string', enum: materialBindings.map(b => b.stage_id) }, resend_requested: { type: 'boolean' } } : {}),
-        },
-      } } : {}),
+      ...(materialBindings ? { execution: executionSchema(materialBindings) } : {}),
       reason: { type: 'string', description: 'Optional explanation; may be empty.' },
     },
+    // The model-facing shape agrees with the validator: a ready action has a
+    // goal, while waiting decisions can only omit it or return null.
+    anyOf: [
+      { required: ['goal'], properties: { status: { enum: ['goal_ready'] }, goal: { type: 'object' } } },
+      { properties: { status: { enum: ['wait', 'no_matching_option'] }, goal: { type: 'null' }, ...(materialBindings ? { execution: { type: 'null' } } : {}) } },
+    ],
   };
 }
 
@@ -88,10 +104,7 @@ export function buildGoalResultSchema() {
           forbidden_points: { type: 'array', description: 'Prohibitions for the writer. Actions belong in instruction, confirmed facts in required_points.', items: { type: 'string' } },
         },
       },
-      execution: {
-        type: ['object', 'null'], additionalProperties: false, required: ['type'],
-        properties: { type: { type: 'string', enum: ['write_message', 'send_material'] }, stage_id: { type: 'string' } },
-      },
+      execution: executionSchema(),
       reason: { type: 'string' },
       request_id: { type: 'string' },
       conversation_revision: { type: ['string', 'null'] },

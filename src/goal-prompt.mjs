@@ -1,4 +1,5 @@
 'use strict';
+import { buildGoalDecisionSchema } from './goal-schema.mjs';
 
 export function renderGoalPrompt(input) {
   const system = [
@@ -22,6 +23,11 @@ export function renderGoalPrompt(input) {
     ...(input.material_bindings ? ['Available verbatim material bindings:', JSON.stringify(input.material_bindings), ''] : []),
     'Extracted conversation state:',
     JSON.stringify(input.conversation_state),
+    '',
+    'Decision JSON schema (follow this shape even when provider-side structured output is unavailable):',
+    JSON.stringify(buildGoalDecisionSchema(input.material_bindings ?? null)),
+    '',
+    'For goal_ready, include a concrete goal instruction. For terminal wait/no_matching_option, omit goal or use null and do not include an execution operation. A write_message execution contains only type; stage_id and resend_requested are only for send_material.',
     '',
     'Determine the next useful move toward the objective. If it requires a message, formulate a concise open-ended writer instruction that identifies what to ask, clarify, or communicate next.',
   ].join('\n');
