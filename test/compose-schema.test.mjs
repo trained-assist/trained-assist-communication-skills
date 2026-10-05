@@ -94,9 +94,23 @@ test('cannot_compose — честный отказ модели, а не оши�
   assert.equal(checked.ok, true);
 });
 
-test('do_not_contact — серверный статус, модель его не возвращает', () => {
-  assert.equal(validateComposeAnswer({ status: 'do_not_contact', key_facts: [], next_goal: null, message: null, warnings: [] }).ok, true);
+test('do_not_contact — серверный статус, и модель его вернуть НЕ может', () => {
+  // Отвергается, а не принимается: иначе одна галлюцинация молча погасила бы
+  // сообщение, которое кандидат имеет право получить.
+  const fromModel = validateComposeAnswer({
+    status: 'do_not_contact', key_facts: [], next_goal: null, message: null, warnings: ['собеседник попросил не писать'],
+  });
+  assert.equal(fromModel.ok, false);
+  assert.ok(fromModel.problems.some((p) => p.includes('status должен быть одним из')));
   assert.ok(!buildComposeAnswerSchema().properties.status.enum.includes('do_not_contact'));
+});
+
+test('message_id: null читается как «id нет», а не как отказ', () => {
+  const pool = buildEvidencePool(INPUT);
+  const checked = validateComposeEvidence({
+    key_facts: [{ fact: 'Вакансия в Москве', evidence: { quote: 'Москва', message_id: null } }],
+  }, pool);
+  assert.deepEqual(checked, { ok: true, problems: [] });
 });
 
 test('лишние поля и неизвестный status отклоняются', () => {

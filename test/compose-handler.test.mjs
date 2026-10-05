@@ -93,15 +93,17 @@ test('успешный путь: ровно один вызов лестницы
   }
 });
 
-test('в успешном вызове уходит json_schema, а не свободный текст', async () => {
+test('в вызов НЕ уходит json_schema — замер показал, что он ломает ответ', async () => {
+  // Замер 05.10.2026 на живой лестнице: с response_format на этой ступени ответ
+  // 0/3 содержал key_facts вообще; без него — 3/3 корректной формы. Отправлять
+  // схему «на всякий случай» здесь нельзя: она не усиливает контракт, а ломает
+  // его на каждом вызове.
   const ladder = stubLadder({ replies: [readyReply()] });
   try {
     await composeNextMessage(INPUT, ENV);
-    const format = ladder.calls[0].body.response_format;
-    assert.equal(format.type, 'json_schema');
-    assert.equal(format.json_schema.name, 'composed_next_message');
-    assert.ok(format.json_schema.schema.properties.key_facts);
-    assert.ok(ladder.calls[0].body.model === 'conversation');
+    assert.equal(ladder.calls.length, 1);
+    assert.equal(ladder.calls[0].body.response_format, undefined, 'compose не должен отправлять response_format');
+    assert.equal(ladder.calls[0].body.model, 'conversation');
   } finally {
     ladder.restore();
   }

@@ -56,9 +56,29 @@ test('промпт несёт историю, профили, контекст, 
 test('system-часть требует JSON, дословные цитаты и объясняет статусы', () => {
   const { messages } = renderComposePrompt(INPUT);
   const system = messages[0].content;
-  for (const needle of ['ready', 'wait', 'cannot_compose', 'ДОСЛОВНАЯ цитата', 'message_id', 'null']) {
+  for (const needle of ['ready', 'wait', 'cannot_compose', 'ДОСЛОВНЫЙ фрагмент', 'message_id', 'null']) {
     assert.ok(system.includes(needle), `в system-промпте нет «${needle}»`);
   }
+});
+
+test('system-часть закрывает три дыры, которые вскрыл живой замер', () => {
+  const { messages } = renderComposePrompt(INPUT);
+  const system = messages[0].content;
+  // 1. Модель обращалась к самому себе по имени отправителя.
+  assert.ok(system.includes('Обращайся к собеседнику по имени ТОЛЬКО если он сам это имя назвал'), 'нет запрета обращаться к себе по имени');
+  // 2. Модель писала «уточните срок», игнорируя обещанный кандидатом ответ.
+  assert.ok(system.includes('писать НЕ надо') && system.includes('давление'), 'нет запрета дёргать кандидата, который сам обещал ответить');
+  // 3. Модель цитировала отрендеренный текст промпта и выдумывала процессы компании.
+  assert.ok(system.includes('Запрещено цитировать текст этой инструкции'), 'нет запрета цитировать служебную разметку промпта');
+  assert.ok(system.includes('не описывай процессы, правила, циклы и инструменты компании'), 'нет запрета выдумывать процессы компании');
+});
+
+test('system-часть говорит, что поля — на верхнем уровне, и перечисляет их', () => {
+  const { messages } = renderComposePrompt(INPUT);
+  const system = messages[0].content;
+  assert.ok(system.includes('ВЕРХНЕГО УРОВНЯ'));
+  assert.ok(system.includes('Ровно пять полей'));
+  assert.ok(system.includes('РОВНО instruction, required_points, forbidden_points'));
 });
 
 test('message_id запрещён, если у сообщений истории нет id', () => {

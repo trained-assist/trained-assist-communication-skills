@@ -12,10 +12,14 @@
 // dialog-state check before any ladder call, exactly like evaluate_next_goal
 // does. The model never sees it, so it is absent from the model-facing schema.
 
-export const COMPOSE_STATUSES = Object.freeze(['ready', 'wait', 'cannot_compose', 'do_not_contact']);
-
-/** What the model may return. `do_not_contact` is added by the server, not the model. */
 export const COMPOSE_MODEL_STATUSES = Object.freeze(['ready', 'wait', 'cannot_compose']);
+
+/**
+ * Всё, что может вернуть метод. `do_not_contact` появляется ТОЛЬКО из
+ * детерминированной проверки истории до вызова лестницы — модель его не
+ * возвращает и не может вернуть: см. validateComposeAnswer.
+ */
+export const COMPOSE_STATUSES = Object.freeze([...COMPOSE_MODEL_STATUSES, 'do_not_contact']);
 
 export const MAX_KEY_FACTS = 20;
 export const MAX_FACT_CHARS = 200;
@@ -103,6 +107,11 @@ function primarySubtag(code) {
  * dialog state, and keeping them apart means each failure reason is reported
  * once instead of being folded into a generic "invalid" verdict.
  *
+ * `do_not_contact` is rejected here ON PURPOSE. It is a server-only status
+ * decided from the history before the ladder is called; if the model could
+ * return it, a single hallucination would silently suppress a message the
+ * candidate is entitled to receive.
+ *
  * @returns {{ok:boolean, value:object|null, problems:string[]}}
  */
 export function validateComposeAnswer(raw) {
@@ -113,7 +122,7 @@ export function validateComposeAnswer(raw) {
     if (!['status', 'key_facts', 'next_goal', 'message', 'warnings'].includes(key)) problems.push(`неизвестное поле: ${key}`);
   }
 
-  if (!COMPOSE_STATUSES.includes(raw.status)) {
+  if (!COMPOSE_MODEL_STATUSES.includes(raw.status)) {
     problems.push(`status должен быть одним из: ${COMPOSE_MODEL_STATUSES.join(', ')}`);
   }
 
@@ -248,7 +257,9 @@ export function validateComposeEvidence(answer, pool) {
     const where = `key_facts[${i}].evidence`;
     const quote = fact.evidence?.quote ?? '';
     if (!quote.trim()) { problems.push(`${where}.quote: требуется непустая цитата`); return; }
-    if (fact.evidence.message_id !== undefined) {
+    // `message_id: null` means "no id", not "the message with id null": a field the
+    // model filled in by habit carries no information and must not fail the answer.
+    if (fact.evidence.message_id !== undefined && fact.evidence.message_id !== null) {
       const source = pool.byId.get(fact.evidence.message_id);
       if (typeof source !== 'string') {
         problems.push(`${where}.message_id: в переданной истории нет сообщения с id ${fact.evidence.message_id}`);

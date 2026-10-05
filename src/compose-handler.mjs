@@ -20,7 +20,6 @@ import { ladderChat, LadderError } from './ladder.mjs';
 import { remainingMethodBudget } from './method-budget.mjs';
 import { parseLooseJson } from './intent-schema.mjs';
 import {
-  buildComposeAnswerSchema,
   validateComposeAnswer,
   validateComposeEvidence,
   buildEvidencePool,
@@ -402,7 +401,6 @@ export async function composeNextMessage(raw, env = {}) {
 
     const profile = resolveModelProfile(input.model_profile);
     const { messages } = renderComposePrompt(input);
-    const schema = buildComposeAnswerSchema();
     const pool = buildEvidencePool(input);
     const rejections = [];
 
@@ -431,7 +429,16 @@ export async function composeNextMessage(raw, env = {}) {
           messages: callMessages,
           temperature: profile.temperature,
           maxTokens: profile.maxTokens,
-          responseFormat: { type: 'json_schema', json_schema: { name: 'composed_next_message', strict: true, schema } },
+          // response_format ЗДЕСЬ НЕ ОТПРАВЛЯЕТСЯ, и это не упущение.
+          // Замер 05.10.2026 на живой лестнице: с json_schema на этой ступени ответ
+          // 0/3 содержал key_facts вообще и засыпал поля входа внутрь next_goal;
+          // без json_schema — 3/3 корректной формы. Сглаживание evidence
+          // (fact+quote на одном уровне, снятие additionalProperties) не помогает:
+          // 1/3 и 2/3. Goal-метод с той же json_schema даёт 3/3 — то есть дело не
+          // в structured output как таковом, а в том, что эта ступень не умеет
+          // выдавать массив объектов внутри схемы.
+          // Контракт от этого не слабеет: JSON разбирается и проверяется на
+          // сервере, а бюджет на ремонт остаётся прежним.
           app: 'communication-skills-compose',
           traceId: input.trace_id || requestId,
           totalTimeoutMs: remainingMethodBudget(started, attempt - 1),

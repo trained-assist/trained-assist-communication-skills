@@ -58,14 +58,15 @@ const BENCH_STATE_SCHEMA = {
 // ───────────────────────── подменённая лестница ─────────────────────────
 
 /**
- * Отвечает по форме запроса, а не по порядку: json_schema.name однозначно
- * называет шаг (compose / state / goal), а writer — единственный вызов без
- * response_format. Порядковой нумерации, как у фейковой лестницы песочницы,
- * здесь нет намеренно: она ломалась бы, как только шаг делает вторую попытку.
+ * Отвечает по форме запроса, а не по порядку: шаг однозначно называет либо
+ * json_schema.name (state / goal), либо x-ladder-app (compose — он намеренно
+ * НЕ шлёт response_format, см. комментарий в compose-handler.mjs), а writer —
+ * единственный вызов, у которого нет ни того, ни другого.
  */
-function offlineReply(body, script) {
+function offlineReply(body, headers, script) {
   const schemaName = body.response_format?.json_schema?.name;
-  if (schemaName === 'composed_next_message') return JSON.stringify(script.compose);
+  const app = String(headers?.['x-ladder-app'] || headers?.get?.('x-ladder-app') || '');
+  if (app === 'communication-skills-compose') return JSON.stringify(script.compose);
   if (schemaName === 'conversation_state') return JSON.stringify({ state: script.state });
   if (schemaName === 'next_communication_goal') return JSON.stringify(script.goal);
   if (script.message === null) return null; // цепочка не должна дойти до writer'а
@@ -77,7 +78,7 @@ function installOfflineLadder(state) {
   globalThis.fetch = async (url, init) => {
     const body = JSON.parse(init.body);
     state.calls.push({ url: String(url), body });
-    const reply = offlineReply(body, state.current.script);
+    const reply = offlineReply(body, init.headers, state.current.script);
     if (reply === null) {
       return new Response(JSON.stringify({ error: { message: 'benchmark: writer не должен вызываться для этого кейса' } }), { status: 500 });
     }
@@ -114,7 +115,10 @@ async function runCompose(c, env) {
     isError: out.isError,
     errorCode: out.isError ? (out.data?.error?.code ?? null) : null,
     status: out.data?.status ?? null,
-    messageText: out.data?.message?.text ?? null,
+    // Fallback-результат — это ответ writer'а, и текст лежит в message_text, а не
+    // в message.text. Без этой ветки каждый fallback выглядел бы «пустым текстом»,
+    // то есть измерялся бы формат ответа, а не качество пути.
+    messageText: out.data?.message?.text ?? out.data?.message_text ?? null,
     nextGoal: out.data?.next_goal?.instruction ?? null,
     facts: (out.data?.key_facts ?? []).map((f) => `${f.fact} ${f.evidence?.quote ?? ''}`),
     attempts: out.data?.generation?.attempts ?? null,
@@ -133,6 +137,7 @@ async function runChain(c, env) {
   const requestId = `bench-${c.id}`;
   const revision = c.input.context_revision ?? `rev-${c.id}`;
 
+  const usage = emptyUsage();
   const stateOut = await extractConversationState({
     conversation_history: c.input.conversation_history,
     state_schema: BENCH_STATE_SCHEMA,
@@ -143,8 +148,9 @@ async function runChain(c, env) {
     request_id: requestId,
   }, env);
   if (stateOut.isError) {
-    return { path: 'chain', isError: true, errorCode: stateOut.data?.error?.code ?? null, status: null, messageText: null, nextGoal: null, facts: [], attempts: null, usedFallback: false, ladderCalls: stateOut.data?.error?.attempts ?? 1, model: null, inputTokens: null, outputTokens: null, latencyMs: Date.now() - started };
+    return { path: 'chain', isError: true, errorCode: stateOut.data?.error?.code ?? null, status: null, messageText: null, nextGoal: null, facts: [], attempts: null, usedFallback: false, ladderCalls: stateOut.data?.error?.attempts ?? 1, model: null, usage, latencyMs: Date.now() - started };
   }
+  addUsage(usage, stateOut.meta?.usage);
 
   const goalOut = await evaluateNextGoal({
     conversation_objective: c.input.conversation_objective,
@@ -153,8 +159,9 @@ async function runChain(c, env) {
     request_id: requestId,
   }, env);
   if (goalOut.isError) {
-    return { path: 'chain', isError: true, errorCode: goalOut.data?.error?.code ?? null, status: null, messageText: null, nextGoal: null, facts: [], attempts: null, usedFallback: false, ladderCalls: 2, model: null, inputTokens: null, outputTokens: null, latencyMs: Date.now() - started };
+    return { path: 'chain', isError: true, errorCode: goalOut.data?.error?.code ?? null, status: null, messageText: null, nextGoal: null, facts: [], attempts: null, usedFallback: false, ladderCalls: 2, model: null, usage, latencyMs: Date.now() - started };
   }
+  addUsage(usage, goalOut.data.usage);
   if (goalOut.data.status !== 'goal_ready') {
     // Штатная остановка цепочки, а не отказ: сообщение не пишется.
     return {
@@ -169,8 +176,7 @@ async function runChain(c, env) {
       usedFallback: false,
       ladderCalls: 2,
       model: goalOut.data.generation.model,
-      inputTokens: goalOut.data.usage?.input_tokens ?? null,
-      outputTokens: goalOut.data.usage?.output_tokens ?? null,
+      usage,
       latencyMs: Date.now() - started,
     };
   }
@@ -199,8 +205,7 @@ async function runChain(c, env) {
     usedFallback: false,
     ladderCalls: 3,
     model: writerOut.data?.generation?.model ?? null,
-    inputTokens: writerOut.data?.usage?.input_tokens ?? null,
-    outputTokens: writerOut.data?.usage?.output_tokens ?? null,
+    usage,
     latencyMs: Date.now() - started,
   };
 }
@@ -214,8 +219,13 @@ const fold = (s) => String(s ?? '').toLowerCase().replace(/ё/g, 'е');
  * compose возвращает key_facts, цепочка — состояние отдельным вызовом. Метки
  * разведены по путям (compose_status / chain_status / compose_facts_include),
  * потому что одна метка на оба пути измеряла бы словарь, а не метод.
+ *
+ * `mode` обязателен намеренно: ТОЧНОЕ число вызовов лестницы — утверждение о
+ * офлайне (там вызовы считает заглушка). В live модель может потребовать
+ * вторую попытку, и это не дефект, а работа ремонта; в live проверяется
+ * ПОТОЛОК. Ровно та же дисциплина, что в scripts/corpus/run.mjs.
  */
-function checkCase(c, r) {
+function checkCase(c, r, mode) {
   const exp = c.expected;
   const problems = [];
   const infra = r.isError && ['LLM_UNAVAILABLE', 'INTERNAL'].includes(r.errorCode);
@@ -242,9 +252,15 @@ function checkCase(c, r) {
     for (const needle of exp.message_forbids || []) {
       if (fold(r.messageText).includes(fold(needle))) problems.push(`в тексте есть запрещённое «${needle}»`);
     }
+
     const expectedCalls = exp.ladder_calls?.[r.path];
-    if (expectedCalls !== undefined && r.ladderCalls !== expectedCalls) {
-      problems.push(`вызовов лестницы ${r.ladderCalls}, ожидалось ${expectedCalls}`);
+    if (mode === 'offline') {
+      if (expectedCalls !== undefined && r.ladderCalls !== expectedCalls) {
+        problems.push(`вызовов лестницы ${r.ladderCalls}, ожидалось ровно ${expectedCalls}`);
+      }
+    } else if (expectedCalls !== undefined && r.ladderCalls > expectedCalls) {
+      // Потолок: ремонтная попытка сверх него означала бы, что бюджет не удержан.
+      problems.push(`вызовов лестницы ${r.ladderCalls}, потолок для этого кейса ${expectedCalls}`);
     }
   }
   return { problems, infra };
@@ -258,12 +274,35 @@ function percentile(sorted, p) {
   return sorted[idx];
 }
 
-function estimateCost(model, inputTokens, outputTokens) {
+/**
+ * Usage must be SUMMED over every call a path makes, not read off the last one.
+ *
+ * Taking only the final step's `usage` made the chain look three times cheaper
+ * than it is: the state and goal calls were dropped, not free. That inverted the
+ * whole cost comparison (measured 05.10.2026: compose ≈ 1.2× the chain, not 0.4×),
+ * so the accumulation lives in one helper that every path must route through.
+ */
+function addUsage(acc, usage) {
+  if (!usage) return acc;
+  if (Number.isFinite(usage.input_tokens)) acc.input_tokens += usage.input_tokens;
+  if (Number.isFinite(usage.output_tokens)) acc.output_tokens += usage.output_tokens;
+  if (Number.isFinite(usage.cached_tokens)) acc.cached_tokens += usage.cached_tokens;
+  return acc;
+}
+
+const emptyUsage = () => ({ input_tokens: 0, output_tokens: 0, cached_tokens: 0 });
+
+function usageOf(acc) {
+  return { source: 'ladder', input_tokens: acc.input_tokens, output_tokens: acc.output_tokens, cached_tokens: acc.cached_tokens };
+}
+
+function estimateCost(model, usage) {
   const price = PRICES_PER_1M[model];
-  if (!price) return null;
-  const input = Number.isFinite(inputTokens) ? inputTokens : 0;
-  const output = Number.isFinite(outputTokens) ? outputTokens : 0;
-  return input * (price[0] / 1e6) + output * (price[1] / 1e6);
+  if (!price || !usage) return null;
+  const input = Number.isFinite(usage.input_tokens) ? usage.input_tokens : 0;
+  const output = Number.isFinite(usage.output_tokens) ? usage.output_tokens : 0;
+  const cached = Number.isFinite(usage.cached_tokens) ? usage.cached_tokens : 0;
+  return (input - cached) * (price[0] / 1e6) + output * (price[1] / 1e6) + cached * (price[2] / 1e6);
 }
 
 function summarise(rows, pathName) {
@@ -290,8 +329,9 @@ function summarise(rows, pathName) {
     ladder_calls_max: rows.reduce((m, r) => Math.max(m, r.ladderCalls), 0),
     p50_ms: percentile(latencies, 50),
     p95_ms: percentile(latencies, 95),
-    total_input_tokens: rows.reduce((s, r) => s + (r.inputTokens || 0), 0),
-    total_output_tokens: rows.reduce((s, r) => s + (r.outputTokens || 0), 0),
+    total_input_tokens: rows.reduce((s, r) => s + (r.usage?.input_tokens || 0), 0),
+    total_output_tokens: rows.reduce((s, r) => s + (r.usage?.output_tokens || 0), 0),
+    total_cached_tokens: rows.reduce((s, r) => s + (r.usage?.cached_tokens || 0), 0),
     cost_usd_known_models: costs.length ? costs.reduce((a, b) => a + b, 0) : null,
     cost_unknown_models: rows.filter((r) => r.cost === null && !r.isError).length,
   };
@@ -321,8 +361,8 @@ export async function runBenchmark({ mode = 'offline', env: envArg = {}, verbose
       state.calls = [];
       const r = await runner(c, env);
       r.ladderCalls = state.calls.length;
-      r.cost = r.isError ? null : estimateCost(r.model, r.inputTokens, r.outputTokens);
-      const checked = checkCase(c, r);
+      r.cost = r.isError ? null : estimateCost(r.model, r.usage);
+      const checked = checkCase(c, r, mode);
       rows.push({
         id: c.id, title: c.title, difficulty: c.difficulty, kind: c.kind,
         ...r, ...checked,
@@ -370,7 +410,7 @@ function metricValues(summary) {
     'valid_result_rate', 'first_pass_rate', 'semantic_error_rate',
     'fallback_rate', 'ladder_calls_total', 'ladder_calls_max',
     'p50_ms', 'p95_ms',
-    'total_input_tokens', 'total_output_tokens', 'cost_usd_known_models', 'cost_unknown_models',
+    'total_input_tokens', 'total_output_tokens', 'total_cached_tokens', 'cost_usd_known_models', 'cost_unknown_models',
   ];
   return keys.map((key) => num(summary[key]));
 }
@@ -458,6 +498,16 @@ export function renderReport({ metrics, fixtures }) {
     '  в README).',
     '- `fallback_rate` в офлайне измеряет только срабатывание проводки fallback на поданных дефектах,',
     '  а не её частоту на живом трафике.',
+    '- **Точное число вызовов лестницы проверяется только в офлайне.** В live сверяется потолок:',
+    '  модель может потребовать вторую попытку ремонта, и это не дефект. Ровно та же дисциплина,',
+    '  что в `scripts/corpus/run.mjs`.',
+    '- **Токены и стоимость суммируются по ВСЕМ вызовам пути.** Сначала я брал `usage` только у последнего',
+    '  шага цепочки и получил «compose в 2.3 раза дороже» — это была ошибка учёта, а не измерение.',
+    '  После исправления: compose ≈ 1.2× цепочки, то есть примерно одинаково.',
+    '- **Замеры 05.10.2026 сделаны на пятой ступени профиля `conversation`**',
+    '  (`opencode-go/mimo-v2.6-flash`): ступени 1–4, включая обе Gemini, в тот момент отказывали.',
+    '  Вывод про `response_format` — свойство этой ступени, а не метода; на Gemini он может не',
+    '  воспроизводиться. До прогона на рабочей ступени качество сравнивать нельзя.',
     '',
   ].join('\n');
 }
