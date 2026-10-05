@@ -21,7 +21,7 @@ import { ladderChat, LadderError } from './ladder.mjs';
 import { renderIntentPrompt } from './intent-prompt.mjs';
 import { runIntentGuard } from './intent-guard.mjs';
 import { compressIntentInput, compressionMetrics, compressionWarnings } from './intent-compress.mjs';
-import { buildDecisionOutputSchema, parseLooseJson, NO_MATCHING_OPTION } from './intent-schema.mjs';
+import { buildDecisionOutputSchema, parseLooseJson, NO_MATCHING_OPTION, INTENT_MAX_NAMES_ONLY_OPTIONS } from './intent-schema.mjs';
 import { TypedError, logEvent } from './typed-error.mjs';
 import { remainingMethodBudget } from './method-budget.mjs';
 
@@ -58,6 +58,12 @@ export const INTENT_MAX_INPUT_CHARS = 120000;
 // варианты (issue #10 §6.4).
 export const INTENT_MAX_DECISION_OPTIONS = 32;
 export const INTENT_MAX_OPTIONS_CHARS = 24000;
+export { INTENT_MAX_NAMES_ONLY_OPTIONS };
+
+function decisionOptionLimit(options) {
+  return options.every(option => isPlainObject(option) && !Object.hasOwn(option, 'description') && !Object.hasOwn(option, 'applicability'))
+    ? INTENT_MAX_NAMES_ONLY_OPTIONS : INTENT_MAX_DECISION_OPTIONS;
+}
 
 // model_profile — только серверный allowlist, как у writer'а. Параметры вызова
 // задают профиль, НЕ модель: rung выбирает общая лестница.
@@ -173,10 +179,11 @@ export function normalizeIntent(raw) {
   if (!Array.isArray(options) || !options.length) {
     push('decision_options: требуется НЕПУСТОЙ список — метод не придумывает варианты');
   } else {
-    if (options.length > INTENT_MAX_DECISION_OPTIONS) {
+    const optionLimit = decisionOptionLimit(options);
+    if (options.length > optionLimit) {
       // A dedicated code, not VALIDATION_ERROR: this is not a malformed field, it is
       // a caller asking for a list the method refuses to silently truncate.
-      throw new TypedError('TOO_MANY_DECISION_OPTIONS', `вариантов ${options.length} > предела ${INTENT_MAX_DECISION_OPTIONS}; урезать список молча нельзя — расширьте бюджет явно`, { decision_options: options.length, limit: INTENT_MAX_DECISION_OPTIONS });
+      throw new TypedError('TOO_MANY_DECISION_OPTIONS', `вариантов ${options.length} > предела ${optionLimit}; урезать список молча нельзя — расширьте бюджет явно`, { decision_options: options.length, limit: optionLimit });
     }
     const ids = new Set();
     options.forEach((o, i) => {
@@ -331,6 +338,7 @@ export function intentInputMetrics(input) {
     active_tasks: tasks.length,
     capabilities: caps.length,
     decision_options: options.length,
+    decision_options_limit: decisionOptionLimit(options),
     runtime_facts: facts.length,
     event_chars: eventChars,
     attachment_chars: attachmentChars,
@@ -357,8 +365,8 @@ function assertFits(metrics, requestId) {
       { request_id: requestId, sizes: { total_chars: metrics.total_chars, limit_chars: INTENT_MAX_INPUT_CHARS, event_chars: metrics.event_chars, history_chars: metrics.history_chars } },
     );
   }
-  if (metrics.decision_options > INTENT_MAX_DECISION_OPTIONS) {
-    throw new TypedError('TOO_MANY_DECISION_OPTIONS', `вариантов ${metrics.decision_options} > предела ${INTENT_MAX_DECISION_OPTIONS}`, { decision_options: metrics.decision_options, limit: INTENT_MAX_DECISION_OPTIONS });
+  if (metrics.decision_options > metrics.decision_options_limit) {
+    throw new TypedError('TOO_MANY_DECISION_OPTIONS', `вариантов ${metrics.decision_options} > предела ${metrics.decision_options_limit}`, { decision_options: metrics.decision_options, limit: metrics.decision_options_limit });
   }
   if (metrics.options_chars > INTENT_MAX_OPTIONS_CHARS) {
     throw new TypedError('TOO_MANY_DECISION_OPTIONS', `описания вариантов ${metrics.options_chars} символов > бюджета ${INTENT_MAX_OPTIONS_CHARS}: варианты нельзя выбрасывать молча`, { options_chars: metrics.options_chars, limit_chars: INTENT_MAX_OPTIONS_CHARS });

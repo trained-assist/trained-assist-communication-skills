@@ -61,6 +61,7 @@ test('inputSchema требует input_bundle, recipient, decision_options', () 
   const schema = buildIntentInputSchema();
   assert.deepEqual(schema.required, ['input_bundle', 'recipient', 'decision_options']);
   assert.equal(schema.properties.decision_options.minItems, 1);
+  assert.equal(schema.properties.decision_options.maxItems, 256);
   assert.deepEqual(schema.properties.decision_options.items.required, ['id']);
   assert.deepEqual(schema.properties.input_bundle.required, ['id', 'events']);
 });
