@@ -74,9 +74,7 @@ export function buildDecisionResultSchema() {
 
 /**
  * MCP `inputSchema` for the tool. `decision_options` carries the closed list the
- * whole method is about, so it is spelled out: id + a meaningful description are
- * both required, `applicability` is optional (issue #10 §3 — «Decision 3» без
- * описания для выбора не годится).
+ * whole method is about: id is required; descriptions and applicability are optional.
  */
 export function buildIntentInputSchema() {
   return {
@@ -147,10 +145,10 @@ export function buildIntentInputSchema() {
           type: 'object',
           properties: {
             id: { type: 'string', description: 'Стабильный id. Не может быть no_matching_option.' },
-            description: { type: 'string', description: 'Содержательное описание: что именно делает этот вариант.' },
+            description: { type: 'string', description: 'Необязательное содержательное описание. Для самодостаточного имени метода передайте только id.' },
             applicability: { type: 'string', description: 'Необязательные условия применения.' },
           },
-          required: ['id', 'description'],
+          required: ['id'],
         },
       },
       decision_priority: {

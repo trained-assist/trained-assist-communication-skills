@@ -25,7 +25,7 @@ import { buildDecisionOutputSchema, parseLooseJson, NO_MATCHING_OPTION } from '.
 import { TypedError, logEvent } from './typed-error.mjs';
 
 export const INTENT_CONTRACT_VERSION = 'v1';
-export const INTENT_PROMPT_VERSION = 'ip1';
+export const INTENT_PROMPT_VERSION = 'ip2';
 
 // ЛЕСТНИЦА РЕЗОЛВЕРА — НЕ ЛЕСТНИЦА WRITER'А.
 //
@@ -188,7 +188,11 @@ export function normalizeIntent(raw) {
         else if (ids.has(id)) push(`decision_options[${i}].id: «${id}» повторяется`);
         else ids.add(id);
       }
-      if (!nonEmptyString(o.description)) {
+      if (!Object.hasOwn(o, 'description')) {
+        if (nonEmptyString(o.id) && !/^[A-Za-z][A-Za-z0-9_.:-]{0,199}$/.test(o.id.trim())) {
+          push(`decision_options[${i}].id: имя метода должно содержать 1–200 символов A–Z, a–z, 0–9, _, ., :, - и начинаться с буквы`);
+        }
+      } else if (!nonEmptyString(o.description)) {
         push(`decision_options[${i}].description: требуется содержательное описание — по одному названию вариант не выбрать`);
       } else {
         const d = o.description.trim();
