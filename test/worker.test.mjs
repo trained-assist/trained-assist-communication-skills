@@ -111,6 +111,8 @@ test('MCP tools/list отдаёт канонические инструмент�
   const intent = result.tools.find((t) => t.name === 'resolve_user_intent');
   assert.deepEqual(intent.outputSchema.required, ['user_goal', 'decision']);
   assert.equal(intent.outputSchema.additionalProperties, false);
+  assert.equal(intent.outputSchema.properties.decision.type, 'string');
+  assert.equal(intent.outputSchema.properties.decision.enum, undefined);
   assert.match(intent.description, /does not execute the selected decision/i);
 });
 

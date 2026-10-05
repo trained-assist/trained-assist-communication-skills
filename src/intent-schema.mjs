@@ -66,7 +66,10 @@ export function buildDecisionOutputSchema(optionIds) {
 
 /** MCP `outputSchema` for the tool — same two fields, published for clients. */
 export function buildDecisionResultSchema() {
-  return buildDecisionOutputSchema([]);
+  const schema = buildDecisionOutputSchema([]);
+  delete schema.properties.decision.enum;
+  schema.properties.decision.minLength = 1;
+  return schema;
 }
 
 /**
