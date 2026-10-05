@@ -38,7 +38,7 @@ export async function ladderChat({
   temperature = 0.7,
   maxTokens = 800,
   timeoutMs = 60000,
-  totalTimeoutMs = 60000,
+  totalTimeoutMs = 120000,
   app = 'communication-skills',
   responseFormat = null,
   reasoningEffort = null,
