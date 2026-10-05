@@ -191,6 +191,7 @@ export async function extractConversationState(raw, env = {}) {
             json_schema: { name: 'conversation_state', strict: true, schema: resultSchema },
           },
           app: 'communication-skills-state',
+          traceId,
           totalTimeoutMs: remainingMethodBudget(t0, attempt - 1),
         });
       } catch (e) {

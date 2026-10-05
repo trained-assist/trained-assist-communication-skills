@@ -254,7 +254,7 @@ test('запрос уходит в общую лестницу с json_schema и
     assert.deepEqual(body.response_format.json_schema.schema.properties.decision.enum, ['quick_llm_reply', 'start_opencode', NO_MATCHING_OPTION]);
     assert.deepEqual(body.response_format.json_schema.schema.required, ['user_goal', 'decision']);
     assert.equal(body.response_format.json_schema.schema.additionalProperties, false);
-    assert.equal(body.ladder_timeout_ms, 20000);
+    assert.equal(body.ladder_timeout_ms, 60000);
   } finally { stub.restore(); }
 });
 
