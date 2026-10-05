@@ -37,3 +37,7 @@ test('provider unavailable stays bounded to one shared ladder call; no hidden cl
 test('explicit shorter rung timeout stays bounded by the remaining total deadline',async()=>{
  const f=stub({contents:['done']});try{await ladderChat({baseUrl:ENV.LLM_LADDER_URL,messages:[{role:'user',content:'fixture'}],timeoutMs:40000,totalTimeoutMs:12000});assert.equal(f.calls[0].ladder_timeout_ms,12000);assert.equal(f.calls[0].ladder_total_timeout_ms,12000);assert.deepEqual(f.timeouts,[17000]);}finally{f.restore();}
 });
+
+test('caller trace IDs are safe ASCII HTTP headers while UUID correlation stays unchanged',async()=>{
+ const f=stub({contents:['done']});try{for(const traceId of ['трасса\n123','6239c236-8068-4bd6-98e3-69ab4ab3e162']){await ladderChat({baseUrl:ENV.LLM_LADDER_URL,messages:[{role:'user',content:'fixture'}],traceId});const value=f.headers.at(-1)['x-ladder-trace'];assert.equal(value,encodeURIComponent(traceId));assert.equal(new Headers(f.headers.at(-1)).get('x-ladder-trace'),value);}}finally{f.restore();}
+});

@@ -68,7 +68,7 @@ export async function ladderChat({
         Authorization: `Bearer ${token || 'missing-token'}`,
         'Content-Type': 'application/json',
         'x-ladder-app': app,
-        ...(traceId ? { 'x-ladder-trace': String(traceId) } : {}),
+        ...(traceId ? { 'x-ladder-trace': encodeURIComponent(String(traceId)) } : {}),
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(totalTimeoutMs + 5000),
