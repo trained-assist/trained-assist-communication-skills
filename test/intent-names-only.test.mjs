@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeIntent, resolveUserIntent, INTENT_MAX_DECISION_OPTIONS } from '../src/intent-handler.mjs';
+import { normalizeIntent, resolveUserIntent, intentInputMetrics, INTENT_MAX_NAMES_ONLY_OPTIONS, INTENT_MAX_DECISION_OPTIONS } from '../src/intent-handler.mjs';
 import { renderIntentPrompt } from '../src/intent-prompt.mjs';
 import { buildDecisionOutputSchema, validateIntentOutput } from '../src/intent-schema.mjs';
 import worker from '../src/index.mjs';
@@ -115,9 +115,9 @@ test('names-only IDs remain unique after trimming and reserve no_matching_option
 });
 
 test('names-only accepts the full bounded list and refuses overflow without truncation', () => {
-  const options = Array.from({ length: INTENT_MAX_DECISION_OPTIONS }, (_, index) => ({ id: `registered_method_${index}` }));
+  const options = Array.from({ length: INTENT_MAX_NAMES_ONLY_OPTIONS }, (_, index) => ({ id: `registered_method_${index}` }));
   const original = input(options);
-  assert.equal(normalizeIntent(original).decision_options.length, INTENT_MAX_DECISION_OPTIONS);
+  assert.equal(normalizeIntent(original).decision_options.length, INTENT_MAX_NAMES_ONLY_OPTIONS);
   const prompt = renderIntentPrompt(original).messages[1].content;
   for (const option of options) assert.ok(prompt.includes(`- id=${option.id}\n`));
   assert.throws(() => normalizeIntent(input([...options, { id: 'one_more' }])), error => error.code === 'TOO_MANY_DECISION_OPTIONS');
@@ -128,4 +128,64 @@ test('provided malformed descriptions still fail instead of silently becoming na
   for (const description of [undefined, null, '', 'short', 'web_current_page']) {
     assert.throws(() => normalizeIntent(input([{ id: 'web_current_page', description }])), error => error.code === 'VALIDATION_ERROR');
   }
+});
+
+for (const count of [66, 256]) {
+  test(`all ${count} names reach the model enum and post-compression coverage`, async () => {
+    const options = Array.from({ length: count }, (_, index) => ({ id: `authorized_method_${index}` }));
+    const originalFetch = globalThis.fetch;
+    const calls = [];
+    globalThis.fetch = async (_url, request) => {
+      calls.push(JSON.parse(request.body));
+      return Response.json({ choices: [{ message: { content: JSON.stringify({ user_goal: 'Показать текущую страницу браузера без изменений', decision: options.at(-1).id }) } }] });
+    };
+    try {
+      const args = input(options);
+      const result = await resolveUserIntent(args, { LLM_LADDER_URL: 'http://ladder.test', LLM_LADDER_TOKEN: 'offline' });
+      assert.equal(result.isError, false);
+      assert.equal(result.data.decision, options.at(-1).id);
+      assert.equal(result.meta.input_metrics.decision_options, count);
+      assert.equal(result.meta.input_metrics.decision_options_limit, 256);
+      assert.equal(result.meta.input_metrics.coverage.decision_options_total, count);
+      assert.equal(result.meta.input_metrics.coverage.decision_options_passed, count);
+      assert.equal(result.meta.input_metrics.coverage.truncated, false);
+      assert.equal(calls.length, 1);
+      assert.deepEqual(calls[0].response_format.json_schema.schema.properties.decision.enum, [...options.map(option => option.id), 'no_matching_option']);
+      const prompt = calls[0].messages.map(message => message.content).join('\n');
+      for (const option of options) assert.ok(prompt.includes(`- id=${option.id}\n`));
+      assert.equal(args.decision_options.length, count);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+}
+
+test('257 names fail explicitly with the actual count and limit before any model call', async () => {
+  const options = Array.from({ length: 257 }, (_, index) => ({ id: `authorized_method_${index}` }));
+  const result = await resolveUserIntent(input(options), {});
+  assert.equal(result.isError, true);
+  assert.equal(result.data.error.code, 'TOO_MANY_DECISION_OPTIONS');
+  assert.equal(result.data.error.decision_options, 257);
+  assert.equal(result.data.error.limit, 256);
+  assert.equal(options.length, 257);
+});
+
+test('described and mixed lists retain the existing 32-option policy and metrics', () => {
+  const options = Array.from({ length: INTENT_MAX_DECISION_OPTIONS }, (_, index) => ({ id: `method_${index}`, description: 'Открыть текущую страницу браузера' }));
+  const args = input(options);
+  normalizeIntent(args);
+  assert.equal(intentInputMetrics(args).decision_options_limit, 32);
+  for (const list of [[...options, { id: 'one_more' }], names.map(id => ({ id })).concat(options)]) {
+    assert.throws(() => normalizeIntent(input(list)), error => error.code === 'TOO_MANY_DECISION_OPTIONS' && error.details.limit === 32);
+  }
+});
+
+test('the 24000-character budget still refuses oversized names-only lists without trimming', async () => {
+  const options = Array.from({ length: 256 }, (_, index) => ({ id: `method_${index}_` + 'x'.repeat(100) }));
+  const result = await resolveUserIntent(input(options), {});
+  assert.equal(result.isError, true);
+  assert.equal(result.data.error.code, 'TOO_MANY_DECISION_OPTIONS');
+  assert.equal(result.data.error.limit_chars, 24000);
+  assert.ok(result.data.error.options_chars > 24000);
+  assert.equal(options.length, 256);
 });

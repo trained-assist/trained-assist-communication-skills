@@ -24,6 +24,8 @@
 /** Reserved value the service adds itself. A caller may not pass it as an option id. */
 export const NO_MATCHING_OPTION = 'no_matching_option';
 
+export const INTENT_MAX_NAMES_ONLY_OPTIONS = 256;
+
 /** Below this a `user_goal` is not a formulated goal — it is a fragment or an echo. */
 export const MIN_GOAL_CHARS = 10;
 
@@ -141,6 +143,7 @@ export function buildIntentInputSchema() {
         type: 'array',
         description: 'Закрытый список решений, который вправе выбрать этот метод. Собственные варианты метод не добавляет.',
         minItems: 1,
+        maxItems: INTENT_MAX_NAMES_ONLY_OPTIONS,
         items: {
           type: 'object',
           properties: {
