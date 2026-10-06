@@ -1,8 +1,10 @@
 # trained-assist-communication-skills
 
+Документы содержат действующие требования, контракты и инструкции. Планы выполнения, статусы, ревью прошлых версий и evidence ведутся в GitHub issues/PR/Project. Целевая модель не является утверждением о текущем deployment; его готовность проверяется по конкретным SHA и приёмке.
+
 Общий state-first контур для диалогов: извлечение состояния, формулирование следующей открытой цели и генерация сообщения. Отдельный resolver выбирает из закрытого списка там, где этого требует вызывающая сторона. Первый потребитель — рекрутинг; далее sales и другие домены.
 
-**Рантайм: Cloudflare Worker** (VM на GCP выводится из эксплуатации — agent#2053, решение владельца 03.10.2026). Методы не зависят от VM: ни файлов, ни процессов, ни локальных секретов. Модель — через общий `trained-assist-llm-ladder`, который сам является Worker'ом, поэтому путь запроса Worker→Worker.
+**Рантайм: Cloudflare Worker.** Методы не зависят от VM: ни файлов, ни процессов, ни локальных секретов. Модель — через общий `trained-assist-llm-ladder`, который сам является Worker'ом, поэтому путь запроса Worker→Worker.
 
 Контракты: [docs/spec.md](docs/spec.md) (writer) · [docs/extract-conversation-state-contract.md](docs/extract-conversation-state-contract.md) (state) · [docs/evaluate-next-goal-contract.md](docs/evaluate-next-goal-contract.md) (goal) · [docs/resolve-user-intent-contract.md](docs/resolve-user-intent-contract.md) (resolver) · ТЗ: [#6](https://github.com/trained-assist/trained-assist-communication-skills/issues/6), [#10](https://github.com/trained-assist/trained-assist-communication-skills/issues/10) и эпик #11
 
