@@ -24,6 +24,8 @@
 /** Reserved value the service adds itself. A caller may not pass it as an option id. */
 export const NO_MATCHING_OPTION = 'no_matching_option';
 
+export const INTENT_MAX_NAMES_ONLY_OPTIONS = 256;
+
 /** Below this a `user_goal` is not a formulated goal — it is a fragment or an echo. */
 export const MIN_GOAL_CHARS = 10;
 
@@ -66,14 +68,15 @@ export function buildDecisionOutputSchema(optionIds) {
 
 /** MCP `outputSchema` for the tool — same two fields, published for clients. */
 export function buildDecisionResultSchema() {
-  return buildDecisionOutputSchema([]);
+  const schema = buildDecisionOutputSchema([]);
+  delete schema.properties.decision.enum;
+  schema.properties.decision.minLength = 1;
+  return schema;
 }
 
 /**
  * MCP `inputSchema` for the tool. `decision_options` carries the closed list the
- * whole method is about, so it is spelled out: id + a meaningful description are
- * both required, `applicability` is optional (issue #10 §3 — «Decision 3» без
- * описания для выбора не годится).
+ * whole method is about: id is required; descriptions and applicability are optional.
  */
 export function buildIntentInputSchema() {
   return {
@@ -140,14 +143,15 @@ export function buildIntentInputSchema() {
         type: 'array',
         description: 'Закрытый список решений, который вправе выбрать этот метод. Собственные варианты метод не добавляет.',
         minItems: 1,
+        maxItems: INTENT_MAX_NAMES_ONLY_OPTIONS,
         items: {
           type: 'object',
           properties: {
             id: { type: 'string', description: 'Стабильный id. Не может быть no_matching_option.' },
-            description: { type: 'string', description: 'Содержательное описание: что именно делает этот вариант.' },
+            description: { type: 'string', description: 'Необязательное содержательное описание. Для самодостаточного имени метода передайте только id.' },
             applicability: { type: 'string', description: 'Необязательные условия применения.' },
           },
-          required: ['id', 'description'],
+          required: ['id'],
         },
       },
       decision_priority: {
