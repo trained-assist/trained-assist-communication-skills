@@ -4,11 +4,11 @@
 
 **Рантайм: Cloudflare Worker** (VM на GCP выводится из эксплуатации — agent#2053, решение владельца 03.10.2026). Методы не зависят от VM: ни файлов, ни процессов, ни локальных секретов. Модель — через общий `trained-assist-llm-ladder`, который сам является Worker'ом, поэтому путь запроса Worker→Worker.
 
-Контракты: [docs/spec.md](docs/spec.md) (writer) · [docs/extract-conversation-state-contract.md](docs/extract-conversation-state-contract.md) (state) · [docs/evaluate-next-goal-contract.md](docs/evaluate-next-goal-contract.md) (goal) · [docs/resolve-user-intent-contract.md](docs/resolve-user-intent-contract.md) (resolver) · ТЗ: [#6](https://github.com/trained-assist/trained-assist-communication-skills/issues/6), [#10](https://github.com/trained-assist/trained-assist-communication-skills/issues/10) и эпик #11
+Контракты: [docs/spec.md](docs/spec.md) (writer) · [docs/extract-conversation-state-contract.md](docs/extract-conversation-state-contract.md) (state) · [docs/evaluate-next-goal-contract.md](docs/evaluate-next-goal-contract.md) (goal) · [docs/next-message-in-dialogue-contract.md](docs/next-message-in-dialogue-contract.md) (compose) · [docs/resolve-user-intent-contract.md](docs/resolve-user-intent-contract.md) (resolver) · ТЗ: [#6](https://github.com/trained-assist/trained-assist-communication-skills/issues/6), [#10](https://github.com/trained-assist/trained-assist-communication-skills/issues/10), [#28](https://github.com/trained-assist/trained-assist-communication-skills/issues/28) и эпик #11
 
 ## Инструменты MCP
 
-### `generate_next_message_to_conversation_partner` (contract v1)
+### `next_message_in_dialogue_from_goal` (contract v1)
 
 Пишет ОДНО следующее сообщение по явно заданной цели. Не выбирает шаг процесса, не отправляет. Возвращает черновик.
 
@@ -35,6 +35,19 @@
 - `wait`, `no_matching_option` и явный запрет контакта возвращают `goal:null`; потребитель останавливается до writer.
 - Ревизия диалога возвращается в ответе для отбрасывания устаревшего результата.
 - `resolve_user_intent` остаётся отдельным методом для задач, где вызывающая сторона действительно передаёт закрытый список решений.
+
+### `next_message_in_dialogue` (contract v1, issue #28)
+
+Один вызов вместо цепочки: возвращает состояние (`key_facts` с дословными цитатами), цель следующего
+шага и текст сообщения. Эксперимент рядом с цепочкой, а не её замена: цепочка остаётся эталоном и
+fallback'ом на технический сбой.
+
+- **Ровно один вызов лестницы** на успешном пути; тест фиксирует число вызовов.
+- **Evidence проверяется дословно.** Цитата обязана быть фрагментом переданных данных; `message_id` — только если id реально переданы. Перефраз не является цитатой.
+- **Статусы `ready` / `wait` / `cannot_compose` / `do_not_contact`.** При любом, кроме `ready`, `message` и `next_goal` — `null`: черновик у `wait` — это противоречие, а не подсказка.
+- **Запрет контакта — серверное решение**, лестница не вызывается вообще.
+- **Fallback наблюдаем и не замаскирован**: результат цепочки с её формой и версией контракта, `_meta.fallback = {used, reason}`.
+- **Не отправляет и не отменяет проверки потребителя**: `ready` — черновик, а не разрешение отправить.
 
 ### `resolve_user_intent` (contract v1)
 
@@ -64,6 +77,7 @@
 | `POST /v1/dialogs/next-message` | writer по REST (issue #6 §1) |
 | `POST /v1/conversations/state/extract` | state extractor по REST (epic #11) |
 | `POST /v1/conversations/next-goal` | выбор следующей цели по state (epic #11) |
+| `POST /v1/conversations/compose` | один вызов: состояние + цель + сообщение (issue #28) |
 | `POST /v1/intents/resolve` | resolver по REST (issue #10 §1) |
 
 Все, кроме `/health`, требуют `Authorization: Bearer <COMMUNICATION_TOKEN>`.
@@ -72,15 +86,19 @@
 
 ```bash
 npm ci
-npm run gate          # check + 156 юнит-тестов + песочница 35/35
+npm run gate          # check + 305 юнит-тестов + песочница 43/43
 npm run corpus        # 72 размеченных кейса resolver'а, офлайн
 npm run corpus:live   # те же кейсы против живой лестницы (нужны её секреты)
+npm run benchmark     # compose vs цепочка, офлайн: конвейер и число вызовов
+npm run benchmark:live # те же кейсы против живой лестницы: p50/p95, токены, стоимость
 npm run dev           # wrangler dev на :8787
 ```
 
 Песочница — замкнутый цикл без сети и модели: фейковая лестница по реальному HTTP-контракту, настоящий MCP `tools/call`. Она проверяет не только ответ, но и **что реально дошло до модели** (`prompt_contains`, `response_format_json_schema`) — иначе состояние диалога можно было бы выкинуть и остаться зелёными.
 
 Размеченный корпус resolver'а (`scripts/corpus/cases.json`, 72 кейса на пяти разных каталогах решений) прогоняется в двух режимах. Офлайн-лестница подменена скриптом: это проверяет контракт, самосогласованность меток и то, что guard ловит поданные ему дефекты — но **не** доказывает, что модель выбирает правильно. Замер качества — только `corpus:live`, и раннер печатает это предупреждение сам.
+
+Бенчмарк `next_message_in_dialogue` против цепочки (`scripts/benchmark/`, 12 синтетических диалогов) устроен так же: офлайн считает конвейер и число вызовов, живой прогон — p50/p95, токены, стоимость, долю успеха с первой попытки и долю fallback. Отчёт — [scripts/benchmark/report.md](scripts/benchmark/report.md), и он сам перечисляет, чего не измеряет.
 
 ## Границы
 
@@ -114,6 +132,9 @@ npm run dev           # wrangler dev на :8787
 - **Сжатия нет.** Вход > 120000 символов → `INPUT_TOO_LARGE` с размерами, без молчаливого slice. Сжатие относительно цели (contract v1.1) — отдельная задача после baseline.
 - **Применимость вариантов — семантика, не детерминированная проверка.** «Два применимых без приоритета → `no_matching_option`» обеспечивается схемой и промптом, а не кодом: определить применимость без модели нельзя. Качество этой границы измеряется корпусом, а не утверждается тестом.
 - **Офлайн-корпус не измеряет модель.** `contract_decision_accuracy: 1` в офлайне — это утверждение о конвейере. Замер качества требует `npm run corpus:live`.
+- **Офлайн-бенчмарк не измеряет задержку, токены и стоимость.** Подменённая лестница отвечает мгновенно и отдаёт константы. Содержательная метрика офлайна — только число вызовов лестницы на кейс.
+- **Слепой оценки качества текста нет.** Она требует отдельного LLM-судьи; оценивать два текста одной и той же моделью без анонимизации — это мерить собственную предвзятость.
+- **Сравнение статусов двух путей требует двух словарей.** У compose — `ready/wait/cannot_compose/do_not_contact`, у цепочки — `generated/needs_context/no_message_needed/wait/do_not_contact`. Одна метка на оба пути измеряла бы словарь, а не метод.
 - **Полнота цели занижена методикой.** Замер 04.10.2026 на живой лестнице: `decision accuracy` 0.85, полнота `user_goal` 0.65–0.71 по строковым корням. Низкая полнота частично артефакт: модель писала «прекратить текущую задачу» вместо «остановить текущую задачу» при верном `decision`. Разделять такие случаи умеет только LLM-судья.
 - **Лестница флапает.** 5–22 сбоя `502 every rung failed` из 63 кейсов в разных прогонах — это доступность воркера, не качество метода. Одиночный живой прогон невоспроизводим; для сравнения пригодны попарные прогоны без `infra_failures`.
 
@@ -127,7 +148,9 @@ npm run dev           # wrangler dev на :8787
 - [x] Epic #11 S0/S1: ADR state-first цепочки и MVP `extract_conversation_state`
 - [x] Epic #11: `evaluate_next_goal` формулирует открытую цель по objective + state; terminal outcomes останавливают цепочку до writer
 - [x] Сжатие длинного ввода: первое + последнее предложение + релевантное из середины, без LLM
-- [x] 173 юнит-теста + песочница 35/35 + корпус 75/75
+- [x] `next_message_in_dialogue` (issue #28): один вызов вместо цепочки, дословный evidence, guard, fallback в цепочку
+- [x] Бенчмарк compose vs цепочки: 12 кейсов, офлайн-прогон зелёный, отчёт с честными ограничениями
+- [x] 305 юнит-тестов + песочница 43/43 + корпус 75/75
 - [x] Живая проверка на workerd: /health, REST и MCP для обоих методов
 - [ ] Живой замер качества resolver'а (`corpus:live`) — нужны секреты общей лестницы
 - [ ] Регистрация в core (agent#2034) — отдельный план

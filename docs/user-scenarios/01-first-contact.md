@@ -10,7 +10,7 @@ Value: рекрутер получает готовый черновик пер�
 
 ## Steps
 
-1. Хост вызывает `tools/call` → `generate_next_message_to_conversation_partner` с:
+1. Хост вызывает `tools/call` → `next_message_in_dialogue_from_goal` с:
    - `goal: {instruction: "познакомиться и уточнить отсутствующий опыт X", required_points: [...], forbidden_points: [...]}`,
    - `communication_style: {instructions, examples}`,
    - `language: "ru"` (явный код),

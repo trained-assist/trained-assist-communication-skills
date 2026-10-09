@@ -5,11 +5,13 @@
   "type": "module",
   "description": "Cloudflare Worker: MCP-методы для state-first цепочки диалога, генерации следующего сообщения и выбора из заданных решений, без VM",
   "scripts": {
-    "check": "node --check src/index.mjs && node --check src/handler.mjs && node --check src/prompt.mjs && node --check src/ladder.mjs && node --check src/dialog-state.mjs && node --check src/typed-error.mjs && node --check src/intent-schema.mjs && node --check src/intent-prompt.mjs && node --check src/intent-guard.mjs && node --check src/intent-handler.mjs && node --check src/state-schema.mjs && node --check src/state-prompt.mjs && node --check src/state-handler.mjs && node --check src/goal-schema.mjs && node --check src/goal-prompt.mjs && node --check src/goal-handler.mjs && node --check src/mcp/protocol.mjs && node --check src/mcp/registry.mjs && node --check src/mcp/entrypoint.mjs && node --check scripts/corpus/run.mjs",
+    "check": "node --check src/*.mjs src/mcp/*.mjs scripts/corpus/run.mjs scripts/benchmark/run.mjs",
     "test": "node --test test/*.test.mjs",
     "sandbox": "bash scripts/sandbox/run.sh",
     "corpus": "node scripts/corpus/run.mjs --offline --verbose",
     "corpus:live": "node scripts/corpus/run.mjs --live --verbose",
+    "benchmark": "node scripts/benchmark/run.mjs --offline --verbose",
+    "benchmark:live": "node scripts/benchmark/run.mjs --live --verbose",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "gate": "npm run check && npm test && npm run sandbox"
