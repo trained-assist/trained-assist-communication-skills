@@ -29,7 +29,11 @@ test('real handler probe uses fixed input and correlation while returning no mod
     assert.deepEqual(body.sideEffects, { modelMayHaveBeenCalled: true, agentStarted: false, messageSent: false, cpTaskCreated: false });
     assert.equal(calls.length, 1);
     assert.equal(calls[0].init.headers['x-ladder-trace'], requestId);
-    assert.equal(JSON.parse(calls[0].init.body).reasoning_effort, 'low');
+    const payload = JSON.parse(calls[0].init.body);
+    assert.equal(payload.reasoning_effort, 'low');
+    assert.ok(payload.messages[1].content.includes('не требует заранее знать'));
+    assert.ok(payload.messages[1].content.includes('кроме проверки доступности'));
+    assert.ok(payload.messages[0].content.includes('не подтверждает его результат'));
     const serialized = JSON.stringify(body);
     for (const value of [token, env.LLM_LADDER_TOKEN, 'Проверить доступность самого помощника', 'fixture-model']) assert.equal(serialized.includes(value), false);
   } finally { globalThis.fetch = original; }
