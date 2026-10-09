@@ -137,6 +137,17 @@ test('runtime_facts передаются с временем актуально�
   assert.ok(without.messages[1].content.includes('(не переданы'));
 });
 
+test('missing state facts allow a later check without claiming its result', () => {
+  const { messages } = renderIntentPrompt(baseInput({
+    input_bundle: { id: 'health-query', events: [{ id: 'e1', type: 'text', author: 'user', text: 'Работает ли помощник?' }] },
+    decision_options: [{ id: 'system_health', description: 'Проверить доступность после выбора маршрута' }],
+  }));
+  assert.ok(messages[0].content.includes('классификация выбирает действие, а не подтверждает его результат'));
+  assert.ok(messages[0].content.includes('варианты позволяют только ответить по уже известным данным'));
+  assert.ok(messages[1].content.includes('выбрать применимый вариант проверки или получения актуальных данных можно'));
+  assert.equal(messages[0].content.includes('основания нет ни у одного варианта'), false);
+});
+
 test('активные задачи и прошлый контекст доходят до классификатора', () => {
   const { messages } = renderIntentPrompt(baseInput({
     dialog_context: {
