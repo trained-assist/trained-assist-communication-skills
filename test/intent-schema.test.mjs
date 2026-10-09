@@ -50,14 +50,19 @@ test('outputSchema публикует ровно два поля для MCP-кл
   const schema = buildDecisionResultSchema();
   assert.deepEqual(schema.required, ['user_goal', 'decision']);
   assert.equal(schema.additionalProperties, false);
-  assert.equal(schema.properties.decision.enum.length, 1);
+  assert.equal(schema.properties.decision.type, 'string');
+  assert.equal(schema.properties.decision.minLength, 1);
+  assert.equal(schema.properties.decision.enum, undefined);
+  assert.equal(validateIntentOutput({ user_goal: 'Проверить состояние системы', decision: 'system_health' }, ['system_health']).ok, true);
+  assert.equal(validateIntentOutput({ user_goal: 'Проверить состояние системы', decision: 'unknown' }, ['system_health']).ok, false);
 });
 
 test('inputSchema требует input_bundle, recipient, decision_options', () => {
   const schema = buildIntentInputSchema();
   assert.deepEqual(schema.required, ['input_bundle', 'recipient', 'decision_options']);
   assert.equal(schema.properties.decision_options.minItems, 1);
-  assert.deepEqual(schema.properties.decision_options.items.required, ['id', 'description']);
+  assert.equal(schema.properties.decision_options.maxItems, 256);
+  assert.deepEqual(schema.properties.decision_options.items.required, ['id']);
   assert.deepEqual(schema.properties.input_bundle.required, ['id', 'events']);
 });
 

@@ -57,6 +57,18 @@ test('health без ladder-конфига → 503 not_configured, а не «ok»
   assert.equal((await res.json()).status, 'not_configured');
 });
 
+test('health exposes only a boolean for the approved ladder endpoint, never its secret binding value', async () => {
+  for (const [endpoint, expected] of [['https://llm-ladder.trainedassist.store', true],
+    ['https://trained-assist-llm-ladder.skillset-apply.workers.dev/', true],
+    ['https://private-token@example.invalid/path?secret=private-token', false]]) {
+    const response = await worker.fetch(new Request('https://example.test/health'), { ...ENV, LLM_LADDER_URL: endpoint });
+    const body = await response.json();
+    assert.equal(body.canonical_ladder_endpoint, expected);
+    assert.equal(JSON.stringify(body).includes(endpoint), false);
+    assert.equal(JSON.stringify(body).includes('private-token'), false);
+  }
+});
+
 test('без Authorization → 401 на /v1, тело с машинным кодом', async () => {
   const res = await call('/v1/dialogs/next-message', { method: 'POST', body: JSON.stringify(VALID_BODY) });
   assert.equal(res.status, 401);
@@ -128,6 +140,8 @@ test('MCP tools/list отдаёт канонические инструмент�
   const intent = result.tools.find((t) => t.name === 'resolve_user_intent');
   assert.deepEqual(intent.outputSchema.required, ['user_goal', 'decision']);
   assert.equal(intent.outputSchema.additionalProperties, false);
+  assert.equal(intent.outputSchema.properties.decision.type, 'string');
+  assert.equal(intent.outputSchema.properties.decision.enum, undefined);
   assert.match(intent.description, /does not execute the selected decision/i);
   // next_message_in_dialogue is the one-call experiment (issue #28): it publishes the
   // same closed status list the validator enforces, minus the server-only status.

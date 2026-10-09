@@ -96,7 +96,7 @@ POST /mcp  tools/call             → тот же handler, structuredContent = �
 | `input_bundle.events[]` | да* | `id` уникален, `type`/`author`/`text` непустые; `origin` ∈ `user_command`\|`forwarded_content`\|`document_content` |
 | `input_bundle.attachments[]` | нет | `id` не совпадает с id события; `content_status` ∈ `text_available`\|`ocr_available`\|`transcript_available`\|`metadata_only`\|`unavailable` |
 | `recipient.role` | да | непустая строка |
-| `decision_options[]` | да | **непустой** список; `id` уникален, непуст, не `no_matching_option`; `description` содержательная (≥12 симв., не повторяет id); `applicability` опционально |
+| `decision_options[]` | да | **непустой** список; `id` уникален, непуст, не `no_matching_option`; `description` опциональна, но если передана — содержательная (≥12 симв., не повторяет id); `applicability` опционально |
 | `decision_priority[]` | нет | каждый id обязан быть в `decision_options`; `no_matching_option` не может иметь приоритета |
 | `capabilities[]` | нет | помогает интерпретировать запрос, **не заменяет** `decision_options` |
 | `dialog_context` | нет | `history[]` и `active_tasks[]` — для «да», «продолжай», «а это?» |
@@ -104,6 +104,8 @@ POST /mcp  tools/call             → тот же handler, structuredContent = �
 | `source_refs[]` | нет | не открываются автоматически |
 | `options.language` | нет | если не задан — определяется по письму пользовательского текста |
 | `model_profile` | нет | только серверный allowlist (`default`) |
+
+Для самодостаточных имён методов допустим список без описаний, например `decision_options: [{"id":"web_current_page"}, {"id":"browser_session_remote_url"}]`. Имена без описаний: 1–200 ASCII-символов, первая буква, далее буквы, цифры, `_`, `.`, `:`, `-`. В промпте остаются только переданные имена, без сгенерированных описаний. Описанные и names-only варианты можно смешивать. Пустое, короткое или дублирующее id явно переданное описание по-прежнему отклоняется. Names-only список без `description` и `applicability` допускает до 256 вариантов; описанные и смешанные списки сохраняют предел 32. Общий бюджет списка — 24000 символов. MCP inputSchema публикует `maxItems: 256`; сервер проверяет соответствующий режиму предел и до, и после сжатия. Превышение отклоняется с фактическим размером и пределом, а не обрезается. Список берётся из разрешённого каталога вызывающей стороны; выбор не исполняет метод и не подтверждает доступ или готовность. Выход остаётся ровно `{user_goal, decision}`, enum строится на каждый запрос.
 
 \* события могут быть пустыми, если есть вложения; пакет без того и другого —
 `VALIDATION_ERROR` («цель выводить не из чего»).

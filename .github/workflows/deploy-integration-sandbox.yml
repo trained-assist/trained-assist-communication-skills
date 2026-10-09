@@ -1,0 +1,37 @@
+name: Deploy Communication integration sandbox
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: communication-v1-sandbox-deploy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run gate
+      - name: Verify account and deploy the fixed sandbox
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test "$CLOUDFLARE_ACCOUNT_ID" = "d740a05e9442c1d0feacae2dfc673e93"
+          npx wrangler whoami > "$RUNNER_TEMP/whoami.txt"
+          grep -F "d740a05e9442c1d0feacae2dfc673e93" "$RUNNER_TEMP/whoami.txt"
+          grep -F "Typeformowner@gmail.com's Account" "$RUNNER_TEMP/whoami.txt"
+          npx wrangler deploy --config wrangler.integration-v1.jsonc --var BUILD_SHA:${GITHUB_SHA}
+      - name: Verify exact source and anonymous MCP rejection
+        run: node scripts/sandbox/deployment-smoke.mjs "$GITHUB_SHA"

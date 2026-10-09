@@ -28,6 +28,7 @@ import { evaluateNextGoal, GOAL_CONTRACT_VERSION } from './goal-handler.mjs';
 import { composeNextMessage, COMPOSE_CONTRACT_VERSION } from './compose-handler.mjs';
 import { TOOLS, SERVER_NAME, SERVER_VERSION, PROTOCOL_VERSION, handleMcpMessage } from './mcp/protocol.mjs';
 import { toolDeps } from './mcp/registry.mjs';
+import { sandboxIntentProbe } from './sandbox-intent-probe.mjs';
 
 function json(status, body, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
@@ -81,6 +82,13 @@ function serveHealth(env) {
   // Report readiness honestly: a missing ladder config means this Worker cannot
   // write anything, and saying "ok" would be a lie a caller acts on.
   const configured = !!(env.LLM_LADDER_URL && env.LLM_LADDER_TOKEN);
+  let canonicalLadderEndpoint = false;
+  try {
+    const endpoint = new URL(env.LLM_LADDER_URL);
+    canonicalLadderEndpoint = endpoint.protocol === 'https:' && !endpoint.username && !endpoint.password
+      && !endpoint.port && ['llm-ladder.trainedassist.store', 'trained-assist-llm-ladder.skillset-apply.workers.dev'].includes(endpoint.hostname)
+      && /^\/?$/.test(endpoint.pathname) && !endpoint.search && !endpoint.hash;
+  } catch { /* readiness still reports missing configuration below */ }
   return json(configured ? 200 : 503, {
     status: configured ? 'ready' : 'not_configured',
     service: SERVER_NAME,
@@ -89,6 +97,7 @@ function serveHealth(env) {
     contract_version: CONTRACT_VERSION,
     prompt_version: PROMPT_VERSION,
     ladder_configured: configured,
+    canonical_ladder_endpoint: canonicalLadderEndpoint,
     capabilities: ['conversation-state-context-v1', 'free-goal-material-execution-v1'],
   });
 }
@@ -98,6 +107,7 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === '/health') return serveHealth(env);
+    if (url.pathname === '/internal/sandbox/intent-probe') return sandboxIntentProbe(request, env);
     if (url.pathname === '/') {
       return json(200, { service: SERVER_NAME, contract_version: CONTRACT_VERSION, endpoints: ['/health', '/mcp', '/v1/dialogs/next-message', '/v1/conversations/state/extract', '/v1/conversations/next-goal', '/v1/conversations/compose', '/v1/intents/resolve'] });
     }
