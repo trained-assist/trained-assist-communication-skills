@@ -23,6 +23,7 @@ import { runIntentGuard } from './intent-guard.mjs';
 import { compressIntentInput, compressionMetrics, compressionWarnings } from './intent-compress.mjs';
 import { buildDecisionOutputSchema, parseLooseJson, NO_MATCHING_OPTION } from './intent-schema.mjs';
 import { TypedError, logEvent } from './typed-error.mjs';
+import { remainingMethodBudget } from './method-budget.mjs';
 
 export const INTENT_CONTRACT_VERSION = 'v1';
 export const INTENT_PROMPT_VERSION = 'ip1';
@@ -453,6 +454,9 @@ export async function resolveUserIntent(raw, env = {}) {
 
       let res;
       try {
+        const remainingMs = remainingMethodBudget(t0, attempt - 1);
+        logEvent('intent', { request_id: requestId, status: 'model_requested', attempts: attempt,
+          elapsed_ms: Date.now() - t0, remaining_budget_ms: remainingMs });
         res = await ladderChat({
           baseUrl: env.LLM_LADDER_URL,
           token: env.LLM_LADDER_TOKEN,
@@ -466,6 +470,8 @@ export async function resolveUserIntent(raw, env = {}) {
           },
           app: 'communication-skills-intent',
           traceId,
+          reasoningEffort: 'low',
+          totalTimeoutMs: remainingMs,
         });
       } catch (e) {
         if (e instanceof LadderError) {
