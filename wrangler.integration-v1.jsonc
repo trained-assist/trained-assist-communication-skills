@@ -3,5 +3,7 @@
   "name": "trained-assist-communication-v1-sandbox",
   "main": "src/index.mjs",
   "compatibility_date": "2025-10-01",
-  "workers_dev": true
+  "workers_dev": true,
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": { "DEPLOYMENT_ENV": "sandbox", "SANDBOX_INTENT_PROBE_ENABLED": "true" }
 }

@@ -26,7 +26,7 @@ const methods=[
 ];
 for(const method of methods){
  test(`${method.name}: a valid 38s answer fits one rung without a discarded 20s attempt`,async()=>{
-  const f=stub({contents:[method.valid],elapsed:[38000]});try{const r=await method.run();assert.equal(r.isError,false,JSON.stringify(r.data));assert.equal(f.calls.length,1);assert.equal(f.calls[0].ladder_timeout_ms,60000);assert.equal(f.calls[0].ladder_total_timeout_ms,120000);assert.equal(f.headers[0]['x-ladder-trace'],`${method.name}-trace`);}finally{f.restore();}
+  const f=stub({contents:[method.valid],elapsed:[38000]});try{const r=await method.run();assert.equal(r.isError,false,JSON.stringify(r.data));assert.equal(f.calls.length,1);assert.equal(f.calls[0].ladder_timeout_ms,60000);assert.equal(f.calls[0].ladder_total_timeout_ms,120000);assert.equal(f.headers[0]['x-ladder-trace'],`${method.name}-trace`);if(method.name==='intent')assert.equal(f.calls[0].reasoning_effort,'low');}finally{f.restore();}
  });
  test(`${method.name}: schema/guard repair receives only remaining method budget`,async()=>{
   const f=stub({contents:[method.invalid,method.valid],elapsed:[30000,1000]});try{const r=await method.run();assert.equal(r.isError,false,JSON.stringify(r.data));assert.equal(f.calls.length,2);assert.deepEqual(f.calls.map(x=>x.ladder_total_timeout_ms),[120000,90000]);assert.deepEqual(f.calls.map(x=>x.ladder_timeout_ms),[60000,60000]);assert.deepEqual(f.timeouts,[125000,95000]);}finally{f.restore();}
