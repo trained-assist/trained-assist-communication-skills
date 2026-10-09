@@ -21,8 +21,10 @@ export async function sandboxIntentProbe(request, env) {
   const result = await resolveUserIntent({ request_id: body.requestId, trace_id: body.requestId,
     input_bundle: { id: body.requestId, events: [{ id: 'synthetic-event', type: 'text', author: 'user', text: 'Работает ли помощник?' }] },
     recipient: { role: 'Помощник trained-assist' },
-    decision_options: [{ id: 'system_health', description: 'Проверить доступность самого помощника после выбора маршрута, затем сообщить проверенные факты.' },
-      { id: 'agent', description: 'Выполнить другую пользовательскую задачу, требующую действий или инструментов.' }],
+    decision_options: [{ id: 'system_health', description: 'Проверить доступность самого помощника после выбора маршрута, затем сообщить проверенные факты.',
+      applicability: 'Вопрос о доступности самого помощника. Выбор запускает последующую проверку и не требует заранее знать её результат.' },
+      { id: 'agent', description: 'Выполнить другую пользовательскую задачу, требующую действий или инструментов.',
+        applicability: 'Другие задачи, кроме проверки доступности самого помощника, которую покрывает system_health.' }],
   }, env);
   const code = result.isError ? ['LLM_UNAVAILABLE', 'INTENT_REJECTED'].includes(result.data?.error?.code)
     ? result.data.error.code : 'probe_failed' : 'resolved';
