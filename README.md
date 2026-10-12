@@ -80,7 +80,7 @@ fallback'ом на технический сбой.
 | `POST /v1/conversations/compose` | один вызов: состояние + цель + сообщение (issue #28) |
 | `POST /v1/intents/resolve` | resolver по REST (issue #10 §1) |
 
-Все, кроме `/health`, требуют `Authorization: Bearer <COMMUNICATION_TOKEN>`.
+Все, кроме `/health`, требуют bearer credential. `COMMUNICATION_TOKEN` остаётся основным; изолированные callers могут использовать отдельные `HH_COMMUNICATION_TOKEN` и `COMMUNICATION_PRODUCTION_TOKEN`, не ротируя уже подключённых потребителей.
 
 ## Запуск и проверка
 
