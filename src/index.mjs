@@ -46,13 +46,15 @@ function wantsSse(request) {
 
 /**
  * Auth: `Authorization: Bearer <COMMUNICATION_TOKEN>` (wrangler secret).
+ * Isolated callers may use additional named secrets without rotating that token.
  * Health is public so a platform probe does not need the secret.
  * `status` is an HTTP status directly — this is the one place a misconfiguration
  * (no secret configured) must NOT be reported as 401, because "you are not
  * authorised" sends the caller hunting for a token that does not exist.
  */
 function authorized(request, env) {
-  const tokens = [env.COMMUNICATION_TOKEN, env.HH_COMMUNICATION_TOKEN].filter(Boolean);
+  const tokens = [env.COMMUNICATION_TOKEN, env.HH_COMMUNICATION_TOKEN,
+    env.COMMUNICATION_PRODUCTION_TOKEN].filter(Boolean);
   if (!tokens.length) return { ok: false, status: 500, code: 'NOT_CONFIGURED', message: 'COMMUNICATION_TOKEN не задан (wrangler secret put COMMUNICATION_TOKEN)' };
   const got = String(request.headers.get('authorization') || '');
   let matched = false;
