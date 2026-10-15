@@ -1,7 +1,7 @@
 # resolve_user_intent — контракт второго метода (issue #10)
 
 ТЗ: [issue #10](https://github.com/trained-assist/trained-assist-communication-skills/issues/10).
-Первый метод — [spec.md](spec.md) (`generate_next_message_to_conversation_partner`).
+Первый метод — [spec.md](spec.md) (`next_message_in_dialogue_from_goal`).
 Методы живут в одном Worker'е и говорят по одному протоколу. Публичный контракт
 `resolve_user_intent` остаётся ровно `{ user_goal, decision }`. Его закрытый
 список решений не используется `evaluate_next_goal`: тот формулирует открытую

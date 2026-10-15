@@ -206,7 +206,10 @@ function evaluateExpectations(exp, data, isError, calls, text = '', prompts = []
     problems.push(`isError=${isError}, ожидалось ${exp.is_error}`);
   }
 
-  const messageText = data && (data.message_text ?? (data.result && data.result.message_text));
+  // resolve_user_intent отдаёт ровно два поля; next_message_in_dialogue прячет текст
+  // в message.text. Обе формы должны проверяться одинаково, иначе «черновик
+  // пуст» для compose стал бы невыразимым.
+  const messageText = data && (data.message_text ?? data.message?.text ?? (data.result && data.result.message_text));
   if (exp.status && (!data || data.status !== exp.status)) {
     problems.push(`status=${JSON.stringify(data && data.status)}, ожидалось "${exp.status}"`);
   }
@@ -246,6 +249,32 @@ function evaluateExpectations(exp, data, isError, calls, text = '', prompts = []
       }
     }
   }
+  if (exp.kind === 'compose') {
+    // Публичный ответ — пять полей контракта next_message_in_dialogue. Их ровно
+    // пять, и шестое поле означало бы, что метод подмевает диагностику в тело.
+    if (exp.exact_fields) {
+      const keys = Object.keys(data || {}).sort();
+      if (JSON.stringify(keys) !== JSON.stringify([...exp.exact_fields].sort())) {
+        problems.push(`поля ответа ${JSON.stringify(keys)}, ожидалось ровно ${JSON.stringify(exp.exact_fields)}`);
+      }
+    }
+    // message=null при не-готовом статусе — это и есть проверка, что wait не
+    // создал текст для отправки.
+    if (exp.message_text_nonempty === false && data?.message?.text) {
+      problems.push(`message.text неожиданно непуст: "${String(data.message.text).slice(0, 80)}"`);
+    }
+    for (const f of exp.meta_fields || []) {
+      if (!deepHasKey(meta, f)) problems.push(`нет диагностики ${f} в _meta`);
+    }
+    // Пояснения к не-готовому статусу — единственное, что отличает честный wait
+    // от «модель промолчала». Проверять их наличие так же важно, как статус.
+    const warnings = data?.warnings;
+    for (const needle of exp.warnings_contains || []) {
+      if (!Array.isArray(warnings) || !warnings.some((w) => String(w).includes(needle))) {
+        problems.push(`в warnings нет «${needle}»`);
+      }
+    }
+  }
   if (exp.message_text_nonempty === true && !(typeof messageText === 'string' && messageText.trim())) {
     problems.push('message_text пуст');
   }
@@ -272,7 +301,9 @@ function evaluateExpectations(exp, data, isError, calls, text = '', prompts = []
   }
   if (exp.usage_present && !deepHasKey(data, 'usage')) problems.push('нет telemetry usage');
   for (const f of exp.absent_fields || []) {
-    if (deepHasKey(data, f)) problems.push(`в ответе есть поле ${f} (успех ≠ отправка)`);
+    // Только верхний уровень: «успех ≠ отправка» про поля самого ответа, и
+    // вложенный message_id в evidence цитаты — не поле ответа.
+    if (data && Object.hasOwn(data, f)) problems.push(`в ответе есть поле ${f} (успех ≠ отправка)`);
   }
   // Asserts on what actually reached the WRITER. This is how "the dialog state is
   // in the prompt" is proven rather than assumed — the state layer is invisible in
@@ -428,11 +459,12 @@ async function main() {
       const names = (listed.result?.tools || []).map((t) => t.name);
       const handshakeOk = record('сценарий', 'S1-mcp-handshake — initialize + tools/list отдаёт канонические инструменты со схемами',
         init.result?.serverInfo?.name === 'trained-assist-communication-skills'
-        && names.includes('generate_next_message_to_conversation_partner')
+        && names.includes('next_message_in_dialogue_from_goal')
         && names.includes('extract_conversation_state')
         && names.includes('evaluate_next_goal')
         && names.includes('resolve_user_intent')
-        && names.length === 4
+        && names.includes('next_message_in_dialogue')
+        && names.length === 5
         && (listed.result?.tools || []).every((t) => t.inputSchema && t.description),
         `serverInfo=${JSON.stringify(init.result?.serverInfo)}, tools=${JSON.stringify(names)}`);
       client.notify('notifications/initialized', {});

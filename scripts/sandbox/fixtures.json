@@ -173,6 +173,28 @@
         { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Подобрать вакансии и созвониться завтра в 15:30\",\"decision\":\"start_opencode\"}" },
         { "kind": "reply", "model": "fake/gemini-3.1-flash", "content": "{\"user_goal\":\"Подобрать вакансии по запросу пользователя\",\"decision\":\"start_opencode\"}" }
       ]
+    },
+    {
+      "match": "Да, готов выполнить тестовое задание.",
+      "responses": [
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "{\"status\":\"ready\",\"key_facts\":[{\"fact\":\"Кандидат подтвердил готовность выполнить тестовое задание\",\"evidence\":{\"quote\":\"Да, готов выполнить тестовое задание.\",\"message_id\":\"m2\"}}],\"next_goal\":{\"instruction\":\"Уточнить объём продаж и количество карточек в месяц\",\"required_points\":[],\"forbidden_points\":[]},\"message\":{\"text\":\"Уточните, пожалуйста, объём продаж и количество карточек в месяц.\",\"language\":\"ru\"},\"warnings\":[]}" },
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "{\"status\":\"wait\",\"key_facts\":[],\"next_goal\":null,\"message\":null,\"warnings\":[\"ждём обещанный ответ кандидата на отправленное задание\"]}" },
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "{\"status\":\"ready\",\"key_facts\":[{\"fact\":\"Кандидат подтвердил готовность выполнить тестовое задание\",\"evidence\":{\"quote\":\"Да, готов выполнить тестовое задание.\",\"message_id\":\"m2\"}}],\"next_goal\":{\"instruction\":\"Уточнить объём продаж и количество карточек в месяц\",\"required_points\":[],\"forbidden_points\":[]},\"message\":{\"text\":\"Подскажите, с какими CRM вы работали и какие задачи в них выполняли?\",\"language\":\"ru\"},\"warnings\":[]}" },
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "{\"status\":\"ready\",\"key_facts\":[{\"fact\":\"Кандидат подтвердил готовность выполнить тестовое задание\",\"evidence\":{\"quote\":\"Да, готов выполнить тестовое задание.\",\"message_id\":\"m2\"}}],\"next_goal\":{\"instruction\":\"Уточнить объём продаж и количество карточек в месяц\",\"required_points\":[],\"forbidden_points\":[]},\"message\":{\"text\":\"Уточните, пожалуйста, объём продаж и количество карточек в месяц.\",\"language\":\"ru\"},\"warnings\":[]}" },
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "{\"status\":\"ready\",\"key_facts\":[{\"fact\":\"Кандидат просил не писать\",\"evidence\":{\"quote\":\"больше не пишите мне\"}}],\"next_goal\":{\"instruction\":\"Уточнить объём продаж и количество карточек в месяц\",\"required_points\":[],\"forbidden_points\":[]},\"message\":{\"text\":\"Уточните, пожалуйста, объём продаж и количество карточек в месяц.\",\"language\":\"ru\"},\"warnings\":[]}" },
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "{\"status\":\"ready\",\"key_facts\":[{\"fact\":\"Кандидат подтвердил готовность выполнить тестовое задание\",\"evidence\":{\"quote\":\"Да, готов выполнить тестовое задание.\",\"message_id\":\"m2\"}}],\"next_goal\":{\"instruction\":\"Уточнить объём продаж и количество карточек в месяц\",\"required_points\":[],\"forbidden_points\":[]},\"message\":{\"text\":\"Уточните, пожалуйста, объём продаж и количество карточек в месяц.\",\"language\":\"ru\"},\"warnings\":[]}" },
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "это не JSON" },
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "{\"status\":\"ready\",\"key_facts\":[{\"fact\":\"Кандидат подтвердил готовность выполнить тестовое задание\",\"evidence\":{\"quote\":\"Да, готов выполнить тестовое задание.\",\"message_id\":\"m2\"}}],\"next_goal\":{\"instruction\":\"Уточнить объём продаж и количество карточек в месяц\",\"required_points\":[],\"forbidden_points\":[]},\"message\":{\"text\":\"Уточните, пожалуйста, объём продаж и количество карточек в месяц.\",\"language\":\"ru\"},\"warnings\":[]}" },
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "снова не JSON" },
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "и опять не JSON" },
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "{\"state\":{\"contact_allowed\":true,\"do_not_contact\":false,\"last_partner_message\":\"Да, готов выполнить тестовое задание.\"}}" },
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "{\"status\":\"goal_ready\",\"goal\":{\"instruction\":\"Уточнить объём продаж и количество карточек в месяц\",\"required_points\":[],\"forbidden_points\":[]},\"reason\":\"\"}" },
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "Уточните, пожалуйста, объём продаж и количество карточек в месяц." },
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "снова не JSON" },
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "и опять не JSON" },
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "{\"state\":{\"contact_allowed\":true,\"do_not_contact\":false,\"last_partner_message\":\"Да, готов выполнить тестовое задание.\"}}" },
+        { "kind": "reply", "model": "fake/gemini-2.5-flash", "content": "{\"status\":\"wait\",\"goal\":null,\"reason\":\"ждём обещанный ответ\"}" }
+      ]
     }
   ],
 
@@ -186,7 +208,7 @@
     {
       "id": "S2-generate-first-contact",
       "title": "Первый контакт: пустая история → status=generated, непустой черновик",
-      "tool": "generate_next_message_to_conversation_partner",
+      "tool": "next_message_in_dialogue_from_goal",
       "arguments": {
         "goal": { "instruction": "Поздоровайтесь и представьтесь, назовите компанию и спросите про опыт работы с CRM-системами. Не задавайте больше двух вопросов." },
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», короткие абзацы, без канцелярита, без восклицательных знаков." },
@@ -211,7 +233,7 @@
     {
       "id": "S3-guard-retry",
       "title": "Guard после генерации: первый draft отклонён, второй принят — ровно 2 вызова лестницы",
-      "tool": "generate_next_message_to_conversation_partner",
+      "tool": "next_message_in_dialogue_from_goal",
       "arguments": {
         "goal": { "instruction": "Уточните один конкретный пробел в опыте кандидата и попросите привести один пример из практики." },
         "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», спокойно и без канцелярита." },
@@ -233,7 +255,7 @@
     {
       "id": "S4-retry-budget-ceiling",
       "title": "Общий retry budget не перемножается: guard не пропускает → ровно 2 вызова лестницы, типизированная ошибка",
-      "tool": "generate_next_message_to_conversation_partner",
+      "tool": "next_message_in_dialogue_from_goal",
       "arguments": {
         "goal": { "instruction": "Дайте краткий ответ из трёх строк о вашем опыте." },
         "communication_style": { "instructions": "Ты — рекрутер NexTouch, отвечай коротко." },
@@ -248,7 +270,7 @@
     {
       "id": "S5-needs-context",
       "title": "Нет подтверждённого факта → status=needs_context + missing_fields, ничего не выдумано",
-      "tool": "generate_next_message_to_conversation_partner",
+      "tool": "next_message_in_dialogue_from_goal",
       "arguments": {
         "goal": {
           "instruction": "Расскажите про любые открытые вакансии, на которые вы сейчас откликаетесь, и назовите их точные названия.",
@@ -268,7 +290,7 @@
     {
       "id": "S6-no-contact-requested",
       "title": "Запрет контакта → no_message_needed, лестница НЕ вызывается (issue #6 R2)",
-      "tool": "generate_next_message_to_conversation_partner",
+      "tool": "next_message_in_dialogue_from_goal",
       "arguments": {
         "goal": { "instruction": "Выясните, можно ли ещё писать кандидату, и если да — предложите вакансию." },
         "communication_style": { "instructions": "Ты — рекрутер NexTouch, вежливо и кратко." },
@@ -289,7 +311,7 @@
     {
       "id": "S7-answered-question-not-repeated",
       "title": "Отвеченный вопрос не переспрашивается; в prompt есть состояние диалога (issue #6 R1)",
-      "tool": "generate_next_message_to_conversation_partner",
+      "tool": "next_message_in_dialogue_from_goal",
       "arguments": {
         "goal": { "instruction": "Уточните формат работы и предложите созвон." },
         "communication_style": { "instructions": "Ты — рекрутер NexTouch, спокойно и без канцелярита." },
@@ -311,7 +333,7 @@
     {
       "id": "S8-input-too-large",
       "title": "Вход не влезает → типизированный INPUT_TOO_LARGE с размерами, без молчаливого slice",
-      "tool": "generate_next_message_to_conversation_partner",
+      "tool": "next_message_in_dialogue_from_goal",
       "arguments": {
         "goal": { "instruction": "Ответьте по вакансии." },
         "communication_style": { "instructions": "Ты — рекрутер NexTouch." },
@@ -331,7 +353,7 @@
     {
       "id": "S9-ladder-api-failure",
       "title": "Ошибка лестницы → isError с типизированным кодом, НЕ пустой успешный ответ",
-      "tool": "generate_next_message_to_conversation_partner",
+      "tool": "next_message_in_dialogue_from_goal",
       "arguments": {
         "goal": { "instruction": "Сгенерируйте одно сообщение с приветствием и одним вопросом о зарплатных ожиданиях." },
         "communication_style": { "instructions": "Ты — рекрутер NexTouch." },
@@ -346,7 +368,7 @@
     {
       "id": "S10-ambiguous-roles",
       "title": "Неразмеченный текст с неясными ролями → needs_context/validation, роли НЕ выдуманы, лестница НЕ вызывается",
-      "tool": "generate_next_message_to_conversation_partner",
+      "tool": "next_message_in_dialogue_from_goal",
       "arguments": {
         "goal": { "instruction": "Ответьте по последнему сообщению собеседника." },
         "communication_style": { "instructions": "Ты — рекрутер NexTouch." },
@@ -656,6 +678,246 @@
         ]
       },
       "expect": { "kind": "intent", "decision": "start_opencode", "user_goal_nonempty": true, "ladder_calls": 2, "exact_fields": ["user_goal", "decision"] }
+    },
+    {
+      "id": "C1-compose-ready",
+      "title": "Один вызов: состояние + цель + сообщение, ровно 1 вызов лестницы",
+      "tool": "next_message_in_dialogue",
+      "arguments": {
+        "conversation_objective": "Квалифицировать опыт кандидата с CRM",
+        "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            { "id": "m1", "speaker": "sender", "text": "Подскажите, с какими CRM вы работали?" },
+            { "id": "m2", "speaker": "partner", "text": "Да, готов выполнить тестовое задание." }
+          ]
+        },
+        "partner_profile": { "format": "text", "text": "Коммерческий опыт в логистике, 4 года." },
+        "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
+        "context": { "vacancy": "Менеджер по продажам B2B, Москва" },
+        "constraints": { "max_characters": 600, "max_questions": 1 },
+        "goal": { "instruction": "Уточнить объём продаж и количество карточек в месяц", "required_points": [], "forbidden_points": [] },
+        "request_id": "sb-compose"
+      },
+      "expect": {
+        "kind": "compose",
+        "status": "ready",
+        "message_text_nonempty": true,
+        "ladder_calls": 1,
+        "generation_fields": ["model", "prompt_version", "contract_version"],
+        "usage_present": true,
+        "absent_fields": ["sent_at", "delivered"],
+        "prompt_contains": ["Квалифицировать опыт кандидата с CRM", "Да, готов выполнить тестовое задание."]
+      }
+    },
+    {
+      "id": "C2-compose-wait",
+      "title": "wait: текста для отправки нет, лестница вызвана один раз",
+      "tool": "next_message_in_dialogue",
+      "arguments": {
+        "conversation_objective": "Квалифицировать опыт кандидата с CRM",
+        "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            { "id": "m1", "speaker": "sender", "text": "Подскажите, с какими CRM вы работали?" },
+            { "id": "m2", "speaker": "partner", "text": "Да, готов выполнить тестовое задание." }
+          ]
+        },
+        "partner_profile": { "format": "text", "text": "Коммерческий опыт в логистике, 4 года." },
+        "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
+        "context": { "vacancy": "Менеджер по продажам B2B, Москва" },
+        "constraints": { "max_characters": 600, "max_questions": 1 },
+        "goal": { "instruction": "Уточнить объём продаж и количество карточек в месяц", "required_points": [], "forbidden_points": [] },
+        "request_id": "sb-compose"
+      },
+      "expect": {
+        "kind": "compose",
+        "status": "wait",
+        "message_text_nonempty": false,
+        "ladder_calls": 1,
+        "warnings_contains": ["ждём обещанный ответ"]
+      }
+    },
+    {
+      "id": "C3-compose-guard-repair",
+      "title": "Переспрос решённого вопроса отклоняется: 2 вызова, второй принят",
+      "tool": "next_message_in_dialogue",
+      "arguments": {
+        "conversation_objective": "Квалифицировать опыт кандидата с CRM",
+        "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            { "id": "m1", "speaker": "sender", "text": "Подскажите, с какими CRM вы работали?" },
+            { "id": "m2", "speaker": "partner", "text": "Да, готов выполнить тестовое задание." }
+          ]
+        },
+        "partner_profile": { "format": "text", "text": "Коммерческий опыт в логистике, 4 года." },
+        "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
+        "context": { "vacancy": "Менеджер по продажам B2B, Москва" },
+        "constraints": { "max_characters": 600, "max_questions": 1 },
+        "goal": { "instruction": "Уточнить объём продаж и количество карточек в месяц", "required_points": [], "forbidden_points": [] },
+        "request_id": "sb-compose"
+      },
+      "expect": {
+        "kind": "compose",
+        "status": "ready",
+        "ladder_calls": 2,
+        "attempts": 2,
+        "message_text_nonempty": true
+      }
+    },
+    {
+      "id": "C4-compose-evidence-repair",
+      "title": "Выдуманная цитата отклоняется валидатором evidence: 2 вызова",
+      "tool": "next_message_in_dialogue",
+      "arguments": {
+        "conversation_objective": "Квалифицировать опыт кандидата с CRM",
+        "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            { "id": "m1", "speaker": "sender", "text": "Подскажите, с какими CRM вы работали?" },
+            { "id": "m2", "speaker": "partner", "text": "Да, готов выполнить тестовое задание." }
+          ]
+        },
+        "partner_profile": { "format": "text", "text": "Коммерческий опыт в логистике, 4 года." },
+        "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
+        "context": { "vacancy": "Менеджер по продажам B2B, Москва" },
+        "constraints": { "max_characters": 600, "max_questions": 1 },
+        "goal": { "instruction": "Уточнить объём продаж и количество карточек в месяц", "required_points": [], "forbidden_points": [] },
+        "request_id": "sb-compose"
+      },
+      "expect": {
+        "kind": "compose",
+        "status": "ready",
+        "ladder_calls": 2,
+        "message_text_nonempty": true
+      }
+    },
+    {
+      "id": "C5-compose-json-repair",
+      "title": "Невалидный JSON → ремонт с причиной, ровно 2 вызова",
+      "tool": "next_message_in_dialogue",
+      "arguments": {
+        "conversation_objective": "Квалифицировать опыт кандидата с CRM",
+        "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            { "id": "m1", "speaker": "sender", "text": "Подскажите, с какими CRM вы работали?" },
+            { "id": "m2", "speaker": "partner", "text": "Да, готов выполнить тестовое задание." }
+          ]
+        },
+        "partner_profile": { "format": "text", "text": "Коммерческий опыт в логистике, 4 года." },
+        "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
+        "context": { "vacancy": "Менеджер по продажам B2B, Москва" },
+        "constraints": { "max_characters": 600, "max_questions": 1 },
+        "goal": { "instruction": "Уточнить объём продаж и количество карточек в месяц", "required_points": [], "forbidden_points": [] },
+        "request_id": "sb-compose"
+      },
+      "expect": {
+        "kind": "compose",
+        "status": "ready",
+        "ladder_calls": 2,
+        "message_text_nonempty": true
+      }
+    },
+    {
+      "id": "C6-compose-fallback-chain",
+      "title": "Обе попытки невалидны → существующая цепочка: 5 вызовов, ответ writer'а",
+      "tool": "next_message_in_dialogue",
+      "arguments": {
+        "conversation_objective": "Квалифицировать опыт кандидата с CRM",
+        "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            { "id": "m1", "speaker": "sender", "text": "Подскажите, с какими CRM вы работали?" },
+            { "id": "m2", "speaker": "partner", "text": "Да, готов выполнить тестовое задание." }
+          ]
+        },
+        "partner_profile": { "format": "text", "text": "Коммерческий опыт в логистике, 4 года." },
+        "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
+        "context": { "vacancy": "Менеджер по продажам B2B, Москва" },
+        "constraints": { "max_characters": 600, "max_questions": 1 },
+        "goal": { "instruction": "Уточнить объём продаж и количество карточек в месяц", "required_points": [], "forbidden_points": [] },
+        "request_id": "sb-compose"
+      },
+      "expect": {
+        "kind": "compose",
+        "status": "generated",
+        "message_text_nonempty": true,
+        "ladder_calls": 5,
+        "meta_fields": ["fallback"]
+      }
+    },
+    {
+      "id": "C7-compose-fallback-wait",
+      "title": "Цепочка остановилась на этапе цели → wait без текста, 4 вызова",
+      "tool": "next_message_in_dialogue",
+      "arguments": {
+        "conversation_objective": "Квалифицировать опыт кандидата с CRM",
+        "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            { "id": "m1", "speaker": "sender", "text": "Подскажите, с какими CRM вы работали?" },
+            { "id": "m2", "speaker": "partner", "text": "Да, готов выполнить тестовое задание." }
+          ]
+        },
+        "partner_profile": { "format": "text", "text": "Коммерческий опыт в логистике, 4 года." },
+        "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
+        "context": { "vacancy": "Менеджер по продажам B2B, Москва" },
+        "constraints": { "max_characters": 600, "max_questions": 1 },
+        "goal": { "instruction": "Уточнить объём продаж и количество карточек в месяц", "required_points": [], "forbidden_points": [] },
+        "request_id": "sb-compose"
+      },
+      "expect": {
+        "kind": "compose",
+        "status": "wait",
+        "message_text_nonempty": false,
+        "ladder_calls": 4,
+        "meta_fields": ["fallback"]
+      }
+    },
+    {
+      "id": "C8-compose-do-not-contact",
+      "title": "Запрет контакта: do_not_contact, лестница НЕ вызывается",
+      "tool": "next_message_in_dialogue",
+      "arguments": {
+        "conversation_objective": "Квалифицировать опыт кандидата с CRM",
+        "communication_style": { "instructions": "Ты — рекрутер NexTouch. Обращение на «вы», коротко, без канцелярита." },
+        "language": "ru",
+        "conversation_history": {
+          "format": "messages",
+          "messages": [
+            { "id": "m1", "speaker": "sender", "text": "Подскажите, с какими CRM вы работали?" },
+            { "id": "m2", "speaker": "partner", "text": "Пожалуйста, не пишите мне больше по этому вопросу." }
+          ]
+        },
+        "partner_profile": { "format": "text", "text": "Коммерческий опыт в логистике, 4 года." },
+        "sender_profile": { "name": "Ольга", "role": "рекрутер", "organization": "NexTouch" },
+        "context": { "vacancy": "Менеджер по продажам B2B, Москва" },
+        "constraints": { "max_characters": 600, "max_questions": 1 },
+        "goal": { "instruction": "Уточнить объём продаж и количество карточек в месяц", "required_points": [], "forbidden_points": [] },
+        "request_id": "sb-compose"
+      },
+      "expect": {
+        "kind": "compose",
+        "status": "do_not_contact",
+        "message_text_nonempty": false,
+        "ladder_calls": 0
+      }
     }
   ]
 }

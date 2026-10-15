@@ -86,7 +86,7 @@ async function main() {
   // 5. MCP-дверь — канонические инструменты в tools/list.
   const list = await post('/mcp', { jsonrpc: '2.0', id: 1, method: 'tools/list' });
   const names = (list.json?.result?.tools || []).map((t) => t.name);
-  check('MCP tools/list → канонические инструменты', names.includes('generate_next_message_to_conversation_partner') && names.includes('extract_conversation_state') && names.includes('evaluate_next_goal') && names.includes('resolve_user_intent'),
+  check('MCP tools/list → канонические инструменты', names.includes('next_message_in_dialogue_from_goal') && names.includes('extract_conversation_state') && names.includes('evaluate_next_goal') && names.includes('resolve_user_intent'),
     `tools=${JSON.stringify(names)}`);
 
   const failed = checks.filter((c) => !c.ok);
