@@ -26,7 +26,7 @@ export const TASK_HANDLERS = {
     const entries = catalog.entries.map(e => `${e.title} (${e.id}): ${e.availability === 'registered'
       ? 'зарегистрировано в каталоге' : e.availability === 'not_connected'
         ? 'требует подключения и выдачи доступа' : 'доступ выдан; работоспособность интеграции не проверена'}`);
-    return { data: { text: `Остальные задачи передаются агенту. Каталог ${catalog.version}:\n${entries.join('\n')}` } };
+    return { data: { text: `Доступные quick answers: ${TASK_TOOLS.map(tool => tool.name).join(', ')}. Остальные задачи передаются агенту. Каталог ${catalog.version}:\n${entries.join('\n')}` } };
   },
 };
 function validArguments(args) {
