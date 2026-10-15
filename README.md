@@ -156,3 +156,28 @@ npm run dev           # wrangler dev на :8787
 - [ ] Регистрация в core (agent#2034) — отдельный план
 - [ ] Адаптер рекрутинга (hh-skill#125) — отдельный план
 - [ ] Сжатие относительно цели (contract v1.1) — после baseline
+
+### Product task replies (architecture #272)
+
+Authenticated `POST /mcp/task-tools` is a separate standard MCP door (`initialize`,
+`tools/list`, `tools/call`) for the caller's read-only task reply catalogue. It
+publishes `system_health` and `catalog.brief`; infrastructure writer/resolver tools
+remain on `/mcp`. Both product wording and applicability belong to
+`src/mcp/task-tools.mjs`. No LLM, Runner or Watcher is called by these handlers.
+Adding a standalone reply changes only this server registry and its tests.
+
+The trusted CP service credential grants access to this entire read-only toolset;
+MCP annotations describe the contract and do not grant rights. CP additionally
+filters the discovered names through its identity authorization snapshot. A
+caller must never expose its service credential to the selector or an end user.
+
+Task reply methods accept exactly `{}` (`additionalProperties:false`), because
+the existing intent resolver returns only `user_goal` and `decision`. Methods
+requiring generated arguments or external actions belong in the agent catalogue.
+CP rejects unsupported task-tool schemas rather than guessing arguments. Trusted
+host facts travel in standard `tools/call.params._meta['trained-assist/context']`:
+`catalog:{version,entries:[{id,title,availability}]}` and `authorizationRef`.
+CP builds this projection from the scoped identity catalogue, never model output
+or raw user metadata. `catalog.brief` rejects missing or invalid context and never
+interprets granted access as verified external readiness. Successful results use
+`structuredContent:{text}`; MCP errors must never become successful replies.
