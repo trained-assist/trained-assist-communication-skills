@@ -224,7 +224,7 @@ export async function handleMcpMessage(msg, env, deps) {
       if (typeof handler !== 'function') {
         return ok(id, toolResult({ isError: true, data: { error: { code: 'HANDLER_NOT_WIRED', message: `инструмент ${name} объявлен, но его handler не подключён` } } }));
       }
-      const out = await handler(params?.arguments ?? {}, env);
+      const out = await handler(params?.arguments ?? {}, env, params?._meta);
       return ok(id, toolResult(out));
     }
     default:
