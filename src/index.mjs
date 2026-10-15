@@ -1,3 +1,4 @@
+import { TASK_TOOLS, TASK_HANDLERS } from './mcp/task-tools.mjs';
 'use strict';
 
 // Cloudflare Worker entry: two doors, one handler (ADR-0001 extended).
@@ -171,7 +172,7 @@ export default {
     }
 
     // ── MCP door ───────────────────────────────────────────────────────────
-    if (url.pathname === '/mcp') {
+    if ((url.pathname === '/mcp' || url.pathname === '/mcp/task-tools')) {
       if (request.method === 'GET') {
         // No server→client stream: this server never initiates messages. Clients
         // that opened one must be able to close it (405 is the spec'd answer).
@@ -183,12 +184,15 @@ export default {
       const body = await readJson(request);
       if (!body.ok) return json(400, { jsonrpc: '2.0', id: null, error: { code: -32700, message: body.message } });
 
-      const result = await handleMcpMessage(body.value, env, toolDeps({
-        tools: TOOLS,
+      const taskDoor = url.pathname === '/mcp/task-tools';
+      const dependencies = toolDeps({
+        tools: taskDoor ? TASK_TOOLS : TOOLS,
         serverName: SERVER_NAME,
         serverVersion: SERVER_VERSION,
         protocolVersion: PROTOCOL_VERSION,
-      }));
+      });
+      if (taskDoor) dependencies.handlers = TASK_HANDLERS;
+      const result = await handleMcpMessage(body.value, env, dependencies);
       // A notification (no id) gets no body per JSON-RPC.
       if (result === undefined) return new Response(null, { status: 202 });
       return wantsSse(request) ? sse(result) : json(200, result, { 'mcp-protocol-version': PROTOCOL_VERSION });
